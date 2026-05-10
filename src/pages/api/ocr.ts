@@ -1,6 +1,5 @@
 import type { APIRoute } from 'astro';
 import Tesseract from 'tesseract.js';
-import Jimp from 'jimp';
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -22,17 +21,12 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Convert file to buffer
+    // Convert file to base64 directly
     const arrayBuffer = await imageFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-
-    // Convert any image format to PNG using Jimp
-    const image = await Jimp.read(buffer);
-    image.grayscale(); // Improve OCR accuracy
-
-    const pngBuffer = await image.getBufferAsync(Jimp.MIME_PNG);
-    const base64Image = pngBuffer.toString('base64');
-    const dataUrl = `data:image/png;base64,${base64Image}`;
+    const mimeType = imageFile.type || 'image/png';
+    const base64Image = buffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
     // Perform OCR using Tesseract.js
     const result = await Tesseract.recognize(dataUrl, 'eng', {
@@ -43,9 +37,9 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (!extractedText) {
       return new Response(JSON.stringify({
-        fonts: [],
         message: 'No text detected in the image',
-        confidence: result.data.confidence
+        confidence: Math.round(result.data.confidence),
+        extractedText: ''
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
@@ -53,9 +47,8 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     return new Response(JSON.stringify({
-      fonts: [],
       extractedText,
-      confidence: result.data.confidence,
+      confidence: Math.round(result.data.confidence),
       message: 'Text extracted from image'
     }), {
       status: 200,
