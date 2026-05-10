@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fontextractor - Extract Beautiful Fonts From Any Website</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'display': ['Outfit', 'sans-serif'],
+                        'body': ['Space Grotesk', 'sans-serif'],
+                        'mono': ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        'obsidian': '#0a0a0f',
+                        'charcoal': '#12121a',
+                        'graphite': '#1a1a24',
+                        'silver': '#a0a0b0',
+                        'neon-mint': '#00ffa3',
+                        'neon-cyan': '#00d4ff',
+                        'neon-pink': '#ff00aa',
+                        'neon-purple': '#9d00ff',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
+                        'slide-up': 'slide-up 0.8s ease-out forwards',
+                        'fade-in': 'fade-in 1s ease-out forwards',
+                        'gradient-shift': 'gradient-shift 8s ease infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        'glow-pulse': {
+                            '0%, 100%': { opacity: '1', filter: 'brightness(1)' },
+                            '50%': { opacity: '0.8', filter: 'brightness(1.2)' },
+                        },
+                        'slide-up': {
+                            '0%': { opacity: '0', transform: 'translateY(40px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        'fade-in': {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        'gradient-shift': {
+                            '0%, 100%': { backgroundPosition: '0% 50%' },
+                            '50%': { backgroundPosition: '100% 50%' },
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: #0a0a0f;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .glass-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 24px;
+        }
+
+        .neon-border {
+            position: relative;
+        }
+
+        .neon-border::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(45deg, #00ffa3, #00d4ff, #9d00ff, #ff00aa);
+            border-radius: inherit;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .neon-border:hover::before {
+            opacity: 1;
+            animation: gradient-shift 2s linear infinite;
+            background-size: 300% 300%;
+        }
+
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.03;
+            z-index: 1000;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #00ffa3 0%, #00d4ff 50%, #9d00ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            background-size: 200% 200%;
+            animation: gradient-shift 4s ease infinite;
+        }
+
+        .hero-glow {
+            background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,255,163,0.15) 0%, transparent 60%),
+                        radial-gradient(ellipse 60% 40% at 80% 50%, rgba(0,212,255,0.1) 0%, transparent 50%),
+                        radial-gradient(ellipse 50% 30% at 20% 80%, rgba(157,0,255,0.1) 0%, transparent 50%);
+        }
+
+        .floating-shapes {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .shape {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0.5;
+        }
+
+        .font-showcase {
+            transform: rotate(-2deg);
+            transition: transform 0.4s ease;
+        }
+
+        .font-showcase:hover {
+            transform: rotate(0deg) scale(1.02);
+        }
+
+        .btn-magnetic {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .btn-magnetic:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(0,255,163,0.3);
+        }
+
+        .typing-cursor::after {
+            content: '|';
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .stagger-1 { animation-delay: 0.1s; }
+        .stagger-2 { animation-delay: 0.2s; }
+        .stagger-3 { animation-delay: 0.3s; }
+        .stagger-4 { animation-delay: 0.4s; }
+        .stagger-5 { animation-delay: 0.5s; }
+    </style>
+</head>
+<body class="relative">
+    <!-- Noise Overlay -->
+    <div class="noise-overlay"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between glass-card px-6 py-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-neon-mint to-neon-cyan flex items-center justify-center">
+                    <svg class="w-6 h-6 text-obsidian" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
+                    </svg>
+                </div>
+                <span class="font-display text-xl font-bold">Fontextractor</span>
+            </div>
+            <div class="hidden md:flex items-center gap-8">
+                <a href="#features" class="text-silver hover:text-white transition-colors">Features</a>
+                <a href="#how-it-works" class="text-silver hover:text-white transition-colors">How It Works</a>
+                <a href="#testimonials" class="text-silver hover:text-white transition-colors">Testimonials</a>
+                <a href="#pricing" class="text-silver hover:text-white transition-colors">Pricing</a>
+            </div>
+            <button class="btn-magnetic bg-gradient-to-r from-neon-mint to-neon-cyan text-obsidian font-semibold px-6 py-2 rounded-full">
+                Get Started
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="relative min-h-screen flex items-center justify-center pt-24 pb-12 overflow-hidden hero-glow">
+        <div class="floating-shapes">
+            <div class="shape w-96 h-96 bg-neon-mint/20 top-0 left-0 animate-float"></div>
+            <div class="shape w-80 h-80 bg-neon-cyan/20 top-1/4 right-0 animate-float" style="animation-delay: -2s"></div>
+            <div class="shape w-72 h-72 bg-neon-purple/20 bottom-0 left-1/4 animate-float" style="animation-delay: -4s"></div>
+        </div>
+
+        <div class="relative z-10 max-w-6xl mx-auto px-6 text-center">
+            <div class="inline-flex items-center gap-2 glass-card px-4 py-2 mb-8 opacity-0 animate-slide-up">
+                <span class="w-2 h-2 rounded-full bg-neon-mint animate-pulse"></span>
+                <span class="text-sm text-silver">✨ Now with AI-powered font detection</span>
+            </div>
+
+            <h1 class="font-display text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight opacity-0 animate-slide-up stagger-1">
+                Extract Fonts<br>
+                <span class="gradient-text">From Any Website</span>
+            </h1>
+
+            <p class="text-xl md:text-2xl text-silver max-w-3xl mx-auto mb-10 opacity-0 animate-slide-up stagger-2">
+                Paste a URL and instantly discover every font used on any website.
+                Preview, compare, and download fonts for your next project.
+            </p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 opacity-0 animate-slide-up stagger-3">
+                <div class="relative w-full max-w-md">
+                    <input type="text" placeholder="https://example.com"
+                        class="w-full glass-card px-6 py-4 pr-14 text-lg outline-none focus:border-neon-mint/50 transition-all font-body">
+                    <button class="absolute right-3 top-1/2 -translate-y-1/2 btn-magnetic bg-neon-mint/20 hover:bg-neon-mint/40 text-neon-mint p-2 rounded-lg transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </button>
+                </div>
+                <button class="btn-magnetic bg-gradient-to-r from-neon-mint to-neon-cyan text-obsidian font-semibold px-8 py-4 rounded-xl text-lg whitespace-nowrap">
+                    Extract Fonts
+                </button>
+            </div>
+
+            <!-- Live Preview Cards -->
+            <div class="flex flex-wrap justify-center gap-6 opacity-0 animate-slide-up stagger-4">
+                <div class="font-showcase glass-card p-6 text-left w-64">
+                    <p class="text-sm text-silver mb-2">Primary Font</p>
+                    <p class="text-2xl font-display text-white">Inter</p>
+                    <p class="text-xs text-silver mt-2">Sans-serif • 400 weight</p>
+                </div>
+                <div class="font-showcase glass-card p-6 text-left w-64" style="animation-delay: -1s">
+                    <p class="text-sm text-silver mb-2">Display Font</p>
+                    <p class="text-2xl font-display font-bold text-white">Playfair Display</p>
+                    <p class="text-xs text-silver mt-2">Serif • 700 weight</p>
+                </div>
+                <div class="font-showcase glass-card p-6 text-left w-64" style="animation-delay: -2s">
+                    <p class="text-sm text-silver mb-2">Monospace</p>
+                    <p class="text-2xl font-mono text-white">JetBrains Mono</p>
+                    <p class="text-xs text-silver mt-2">Code • 400 weight</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="py-16 border-y border-white/5">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+                <div class="opacity-0 animate-fade-in stagger-1">
+                    <div class="font-display text-4xl md:text-5xl font-bold gradient-text">2M+</div>
+                    <p class="text-silver mt-2">Fonts Extracted</p>
+                </div>
+                <div class="opacity-0 animate-fade-in stagger-2">
+                    <div class="font-display text-4xl md:text-5xl font-bold gradient-text">150K+</div>
+                    <p class="text-silver mt-2">Websites Scanned</p>
+                </div>
+                <div class="opacity-0 animate-fade-in stagger-3">
+                    <div class="font-display text-4xl md:text-5xl font-bold gradient-text">99.9%</div>
+                    <p class="text-silver mt-2">Accuracy Rate</p>
+                </div>
+                <div class="opacity-0 animate-fade-in stagger-4">
+                    <div class="font-display text-4xl md:text-5xl font-bold gradient-text">Free</div>
+                    <p class="text-silver mt-2">To Use</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-24 relative">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="text-center mb-16">
+                <span class="text-neon-mint text-sm font-mono uppercase tracking-widest">Capabilities</span>
+                <h2 class="font-display text-4xl md:text-5xl font-bold mt-4">Everything You Need</h2>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Feature 1 -->
+                <div class="glass-card p-8 neon-border group hover:border-neon-mint/30 transition-all opacity-0 animate-slide-up stagger-1">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-neon-mint/20 to-neon-cyan/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-7 h-7 text-neon-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-display text-xl font-semibold mb-3">Instant Analysis</h3>
+                    <p class="text-silver">Get comprehensive font reports in seconds. Our AI detects font families, weights, and styles automatically.</p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="glass-card p-8 neon-border group hover:border-neon-cyan/30 transition-all opacity-0 animate-slide-up stagger-2">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-neon-cyan/20 to-neon-purple/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-7 h-7 text-neon-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-display text-xl font-semibold mb-3">Live Preview</h3>
+                    <p class="text-silver">Preview fonts with your own text. See exactly how they'll look before downloading.</p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="glass-card p-8 neon-border group hover:border-neon-pink/30 transition-all opacity-0 animate-slide-up stagger-3">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-neon-pink/20 to-neon-purple/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-7 h-7 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 10l4-4m0 0l-4-4m4 4V3"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-display text-xl font-semibold mb-3">One-Click Download</h3>
+                    <p class="text-silver">Download fonts directly or get links to purchase from official sources. No hassle, no confusion.</p>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="glass-card p-8 neon-border group hover:border-neon-mint/30 transition-all opacity-0 animate-slide-up stagger-4">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-neon-mint/20 to-neon-cyan/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-7 h-7 text-neon-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-display text-xl font-semibold mb-3">CSS Export</h3>
+                    <p class="text-silver">Get ready-to-use CSS code with @font-face rules and fallbacks. Copy, paste, done.</p>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="glass-card p-8 neon-border group hover:border-neon-cyan/30 transition-all opacity-0 animate-slide-up stagger-5">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-neon-cyan/20 to-neon-purple/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-7 h-7 text-neon-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-display text-xl font-semibold mb-3">Compare Fonts</h3>
+                    <p class="text-silver">Compare multiple fonts side-by-side. See differences in weight, style, and appearance.</p>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="glass-card p-8 neon-border group hover:border-neon-pink/30 transition-all opacity-0 animate-slide-up stagger-5">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-neon-pink/20 to-neon-purple/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-7 h-7 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-display text-xl font-semibold mb-3">Privacy First</h3>
+                    <p class="text-silver">No data stored. No tracking. Your URLs and font searches stay completely private.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section id="how-it-works" class="py-24 bg-charcoal/50">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="text-center mb-16">
+                <span class="text-neon-cyan text-sm font-mono uppercase tracking-widest">Process</span>
+                <h2 class="font-display text-4xl md:text-5xl font-bold mt-4">How It Works</h2>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="text-center">
+                    <div class="w-20 h-20 rounded-full bg-gradient-to-br from-neon-mint to-neon-cyan flex items-center justify-center mx-auto mb-6 text-obsidian font-display text-3xl font-bold">1</div>
+                    <h3 class="font-display text-xl font-semibold mb-3">Paste URL</h3>
+                    <p class="text-silver">Enter any website URL and let our engine analyze the typography.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-20 h-20 rounded-full bg-gradient-to-br from-neon-cyan to-neon-purple flex items-center justify-center mx-auto mb-6 text-obsidian font-display text-3xl font-bold">2</div>
+                    <h3 class="font-display text-xl font-semibold mb-3">AI Analysis</h3>
+                    <p class="text-silver">Our AI detects fonts, weights, and styles with 99.9% accuracy.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-20 h-20 rounded-full bg-gradient-to-br from-neon-pink to-neon-purple flex items-center justify-center mx-auto mb-6 text-obsidian font-display text-3xl font-bold">3</div>
+                    <h3 class="font-display text-xl font-semibold mb-3">Download</h3>
+                    <p class="text-silver">Preview, compare, and download fonts instantly.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section id="testimonials" class="py-24">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="text-center mb-16">
+                <span class="text-neon-pink text-sm font-mono uppercase tracking-widest">Feedback</span>
+                <h2 class="font-display text-4xl md:text-5xl font-bold mt-4">Loved by Designers</h2>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="glass-card p-8">
+                    <div class="flex items-center gap-1 mb-4">
+                        <span class="text-neon-mint">★★★★★</span>
+                    </div>
+                    <p class="text-lg text-white mb-4">"Fontextractor saved me hours of manually hunting down fonts. It's become my secret weapon for design inspiration."</p>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-neon-mint to-neon-cyan"></div>
+                        <div>
+                            <p class="font-semibold">Sarah Chen</p>
+                            <p class="text-sm text-silver">UI Designer at Stripe</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-card p-8">
+                    <div class="flex items-center gap-1 mb-4">
+                        <span class="text-neon-mint">★★★★★</span>
+                    </div>
+                    <p class="text-lg text-white mb-4">"The CSS export feature is a game changer. I can grab fonts from competitors and implement them instantly."</p>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-neon-cyan to-neon-purple"></div>
+                        <div>
+                            <p class="font-semibold">Marcus Johnson</p>
+                            <p class="text-sm text-silver">Frontend Developer</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-24 relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-r from-neon-mint/10 via-neon-cyan/10 to-neon-purple/10"></div>
+        <div class="max-w-4xl mx-auto px-6 text-center relative z-10">
+            <h2 class="font-display text-4xl md:text-6xl font-bold mb-6">Ready to Extract?</h2>
+            <p class="text-xl text-silver mb-10">Join 150,000+ designers using Fontextractor to discover beautiful fonts.</p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <input type="email" placeholder="Enter your email" class="glass-card px-6 py-4 text-lg outline-none focus:border-neon-mint/50 w-full max-w-sm">
+                <button class="btn-magnetic bg-gradient-to-r from-neon-mint to-neon-cyan text-obsidian font-semibold px-8 py-4 rounded-xl text-lg">
+                    Start Free
+                </button>
+            </div>
+            <p class="text-sm text-silver mt-4">No credit card required • Free forever plan</p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 border-t border-white/5">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-mint to-neon-cyan flex items-center justify-center">
+                        <svg class="w-5 h-5 text-obsidian" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
+                        </svg>
+                    </div>
+                    <span class="font-display font-bold">Fontextractor</span>
+                </div>
+                <div class="flex items-center gap-6 text-silver">
+                    <a href="#" class="hover:text-white transition-colors">Privacy</a>
+                    <a href="#" class="hover:text-white transition-colors">Terms</a>
+                    <a href="#" class="hover:text-white transition-colors">Twitter</a>
+                    <a href="#" class="hover:text-white transition-colors">GitHub</a>
+                </div>
+                <p class="text-silver text-sm">© 2024 Fontextractor. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Intersection Observer for animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.animate-slide-up, .animate-fade-in').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Smooth scroll for nav links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

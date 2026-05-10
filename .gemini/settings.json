@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "astro-docs": {
+      "httpUrl": "https://mcp.docs.astro.build/mcp"
+    }
+  }
+}
