@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import Tesseract from 'tesseract.js';
+import Jimp from 'jimp';
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -13,15 +14,6 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Validate file type
-    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
-    if (!validTypes.includes(imageFile.type)) {
-      return new Response(JSON.stringify({ error: 'Invalid image format. Supported: PNG, JPG, WEBP, GIF' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
     // Validate file size (max 10MB)
     if (imageFile.size > 10 * 1024 * 1024) {
       return new Response(JSON.stringify({ error: 'Image too large. Max size: 10MB' }), {
@@ -30,11 +22,17 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Convert file to base64
+    // Convert file to buffer
     const arrayBuffer = await imageFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const base64Image = buffer.toString('base64');
-    const dataUrl = `data:${imageFile.type};base64,${base64Image}`;
+
+    // Convert any image format to PNG using Jimp
+    const image = await Jimp.read(buffer);
+    image.grayscale(); // Improve OCR accuracy
+
+    const pngBuffer = await image.getBufferAsync(Jimp.MIME_PNG);
+    const base64Image = pngBuffer.toString('base64');
+    const dataUrl = `data:image/png;base64,${base64Image}`;
 
     // Perform OCR using Tesseract.js
     const result = await Tesseract.recognize(dataUrl, 'eng', {
