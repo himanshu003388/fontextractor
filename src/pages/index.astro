@@ -431,53 +431,63 @@ import '../styles/global.css';
 
       if (extractedText) {
         // Try to get font name from the OCR results
-        let detectedFont = "Unknown Font";
+        let detectedFont: string | null = null;
         if (data.words && data.words.length > 0) {
-          // Look for a word that has a font name
+          // Look for a word that has a valid font name
           for (const word of data.words) {
-            if (word.font_name && word.font_name !== 'Unknown') {
+            if (word.font_name && word.font_name !== 'Unknown' && word.font_name.length > 2) {
               detectedFont = word.font_name.replace(/_/g, ' ');
               break;
             }
           }
         }
 
-        if (detectedFont !== "Unknown Font") {
-          const fontLink = document.createElement('link');
-          fontLink.href = `https://fonts.googleapis.com/css2?family=${detectedFont.replace(/\s+/g, '+')}&display=swap`;
-          fontLink.rel = 'stylesheet';
-          document.head.appendChild(fontLink);
-          
+        // Only set fonts if we have a valid detected font
+        if (detectedFont && detectedFont !== 'Unknown') {
+          try {
+            const fontLink = document.createElement('link');
+            fontLink.href = `https://fonts.googleapis.com/css2?family=${detectedFont.replace(/\s+/g, '+')}&display=swap`;
+            fontLink.rel = 'stylesheet';
+            document.head.appendChild(fontLink);
+          } catch {}
+
           currentFonts = [detectedFont];
           exportTailwindBtn.classList.remove('hidden');
           exportCssBtn.classList.remove('hidden');
         } else {
+          // Font detection not supported for images - show extracted text only
           currentFonts = [];
           exportTailwindBtn.classList.add('hidden');
           exportCssBtn.classList.add('hidden');
         }
 
-        resultCount.textContent = `1 Font Detected • ${Math.round(data.confidence)}% confidence`;
+        resultCount.textContent = detectedFont
+          ? `Font Detected: ${detectedFont} • ${Math.round(data.confidence)}%`
+          : `Text Extracted • ${Math.round(data.confidence)}% confidence`;
+
         fontsGrid.innerHTML = '';
 
         const card = document.createElement('div');
         card.className = 'bg-[#121212] border border-[#222] p-6 hover:border-primary transition-colors group relative overflow-hidden cursor-pointer';
-        
+
         const bgPattern = document.createElement('div');
         bgPattern.className = 'absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity bg-[radial-gradient(#ff4f00_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none';
         card.appendChild(bgPattern);
 
-        const fontStyle = detectedFont !== "Unknown Font" ? `style="font-family: '${detectedFont}', sans-serif;"` : 'class="font-mono"';
+        const fontLabel = detectedFont || 'Image Text';
+        const fontStyle = detectedFont
+          ? `style="font-family: '${detectedFont}', sans-serif;"`
+          : 'class="font-mono text-neutral-300"';
 
         card.innerHTML += `
           <div class="relative z-10">
             <div class="font-mono text-[10px] text-neutral-500 mb-4 uppercase flex justify-between">
-              <span>Family (Detected)</span>
+              <span>${detectedFont ? 'Family (Detected)' : 'Source'}</span>
               <span class="text-primary hidden group-hover:inline-block">Click to Copy Text</span>
             </div>
-            <h3 class="font-display text-2xl text-white mb-2 truncate" title="${detectedFont}">${detectedFont}</h3>
-            <p class="text-xl mt-6 line-clamp-3 text-neutral-300" ${fontStyle}>${extractedText}</p>
-            
+            <h3 class="font-display text-2xl text-white mb-2 truncate" title="${fontLabel}">${fontLabel}</h3>
+            <p class="text-xl mt-6 line-clamp-3" ${fontStyle}>${extractedText}</p>
+
             <div class="mt-4 pt-4 border-t border-[#222] flex justify-between items-center">
               <span class="text-[10px] font-mono text-neutral-600 uppercase">OCR Confidence</span>
               <span class="text-[10px] font-mono text-primary">${Math.round(data.confidence)}%</span>
