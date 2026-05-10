@@ -78,6 +78,15 @@ import '../styles/global.css';
           </button>
         </div>
 
+        <!-- Recent Scans -->
+        <div id="recentScansContainer" class="hidden mt-3 flex flex-wrap items-center gap-2 text-xs font-mono">
+          <span class="text-neutral-500 uppercase flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Recent:
+          </span>
+          <div id="recentScansList" class="flex gap-2 flex-wrap"></div>
+        </div>
+
         <!-- Image Upload Form -->
         <div id="imageForm" class="hidden">
           <div class="bg-[#121212] border border-[#222] p-1 flex flex-col gap-1 relative group">
@@ -114,13 +123,38 @@ import '../styles/global.css';
 
         <!-- Results Area -->
         <div id="resultsArea" class="hidden mt-8">
-          <div class="flex items-center justify-between border-b border-[#222] pb-2 mb-4">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-[#222] pb-2 mb-4 gap-4">
             <h2 class="font-display text-2xl font-bold uppercase tracking-tight">Extracted Data</h2>
-            <span id="resultCount" class="font-mono text-sm text-primary border border-primary px-3 py-1 bg-primary/10">0 Fonts Found</span>
+            <div class="flex flex-wrap items-center gap-2">
+              <button id="exportTailwindBtn" class="hidden font-mono text-xs text-white border border-[#222] hover:border-primary hover:text-primary transition-colors px-3 py-1 bg-[#121212]">Export Tailwind</button>
+              <button id="exportCssBtn" class="hidden font-mono text-xs text-white border border-[#222] hover:border-primary hover:text-primary transition-colors px-3 py-1 bg-[#121212]">Export CSS</button>
+              <span id="resultCount" class="font-mono text-sm text-primary border border-primary px-3 py-1 bg-primary/10">0 Fonts Found</span>
+            </div>
           </div>
 
           <div id="fontsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- Font cards will be injected here -->
+          </div>
+        </div>
+
+        <!-- Export Modal -->
+        <div id="exportModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 opacity-0 transition-opacity duration-300">
+          <div class="bg-[#121212] border border-[#222] w-full max-w-2xl relative transform scale-95 transition-transform duration-300" id="exportModalContent">
+            <button id="closeExportBtn" class="absolute top-4 right-4 text-neutral-500 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <div class="p-6 border-b border-[#222]">
+              <h3 id="exportModalTitle" class="font-display text-xl text-white uppercase tracking-wider">Export Config</h3>
+            </div>
+            <div class="p-6 relative">
+              <pre class="font-mono text-sm text-green-400 bg-[#050505] p-4 overflow-x-auto border border-[#222] rounded"><code id="exportCode"></code></pre>
+            </div>
+            <div class="p-6 border-t border-[#222] flex justify-end gap-4">
+              <button id="closeExportBtn2" class="text-neutral-400 hover:text-white font-mono text-xs uppercase px-4 py-2 transition-colors">Close</button>
+              <button id="copyExportBtn" class="bg-white text-black font-display font-bold uppercase tracking-wider text-xs px-6 py-2 hover:bg-primary hover:text-white transition-colors flex items-center gap-2">
+                <span id="copyExportText">Copy Code</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -138,8 +172,7 @@ import '../styles/global.css';
 </Layout>
 
 <script>
-  // @ts-ignore
-  import { createWorker, PSM } from 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.mjs';
+  import { createWorker } from 'tesseract.js';
 
   const input = document.getElementById('urlInput') as HTMLInputElement;
   const btn = document.getElementById('extractBtn') as HTMLButtonElement;
@@ -168,6 +201,132 @@ import '../styles/global.css';
   const ocrLoadingIcon = document.getElementById('ocrLoadingIcon') as HTMLElement;
 
   let selectedImage: File | null = null;
+  let currentFonts: string[] = [];
+
+  // Export Modal Elements
+  const exportTailwindBtn = document.getElementById('exportTailwindBtn') as HTMLButtonElement;
+  const exportCssBtn = document.getElementById('exportCssBtn') as HTMLButtonElement;
+  const exportModal = document.getElementById('exportModal') as HTMLElement;
+  const exportModalContent = document.getElementById('exportModalContent') as HTMLElement;
+  const closeExportBtn = document.getElementById('closeExportBtn') as HTMLButtonElement;
+  const closeExportBtn2 = document.getElementById('closeExportBtn2') as HTMLButtonElement;
+  const exportModalTitle = document.getElementById('exportModalTitle') as HTMLElement;
+  const exportCode = document.getElementById('exportCode') as HTMLElement;
+  const copyExportBtn = document.getElementById('copyExportBtn') as HTMLButtonElement;
+  const copyExportText = document.getElementById('copyExportText') as HTMLElement;
+
+  // History handling
+  const RECENT_SCANS_KEY = 'fontextractor_recent_scans';
+  function getRecentScans(): string[] {
+    try {
+      return JSON.parse(localStorage.getItem(RECENT_SCANS_KEY) || '[]');
+    } catch { return []; }
+  }
+  function addRecentScan(url: string) {
+    let scans = getRecentScans();
+    scans = [url, ...scans.filter(s => s !== url)].slice(0, 5);
+    localStorage.setItem(RECENT_SCANS_KEY, JSON.stringify(scans));
+    renderRecentScans();
+  }
+  function renderRecentScans() {
+    const scans = getRecentScans();
+    const container = document.getElementById('recentScansContainer');
+    const list = document.getElementById('recentScansList');
+    if (!container || !list) return;
+    
+    if (scans.length > 0) {
+      container.classList.remove('hidden');
+      list.innerHTML = scans.map(url => `
+        <button class="recent-scan-btn text-neutral-400 hover:text-primary transition-colors border border-[#222] hover:border-primary px-2 py-1 bg-[#121212]" data-url="${url}">
+          ${new URL(url.startsWith('http') ? url : 'https://'+url).hostname.replace('www.', '')}
+        </button>
+      `).join('');
+      
+      document.querySelectorAll('.recent-scan-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const url = (e.currentTarget as HTMLElement).dataset.url;
+          if (url) {
+            input.value = url;
+            performExtraction();
+          }
+        });
+      });
+    } else {
+      container.classList.add('hidden');
+    }
+  }
+
+  renderRecentScans();
+
+  // Export Logic
+  function openExportModal(type: 'tailwind' | 'css') {
+    if (currentFonts.length === 0) return;
+    
+    let code = '';
+    if (type === 'tailwind') {
+      exportModalTitle.textContent = 'Tailwind Config';
+      const fontObj = currentFonts.reduce((acc: any, font, index) => {
+        const key = font.toLowerCase().replace(/\s+/g, '-');
+        acc[key] = [font, 'sans-serif'];
+        return acc;
+      }, {});
+      code = `// tailwind.config.js\nmodule.exports = {\n  theme: {\n    extend: {\n      fontFamily: ${JSON.stringify(fontObj, null, 8).replace(/"/g, "'").replace(/}$/, '      }')}\n    }\n  }\n}`;
+    } else {
+      exportModalTitle.textContent = 'CSS Variables';
+      const cssVars = currentFonts.map(font => {
+        const key = font.toLowerCase().replace(/\s+/g, '-');
+        return `  --font-${key}: '${font}', sans-serif;`;
+      }).join('\n');
+      code = `:root {\n${cssVars}\n}`;
+    }
+    
+    exportCode.textContent = code;
+    exportModal.classList.remove('hidden');
+    // small delay for transition
+    setTimeout(() => {
+      exportModal.classList.remove('opacity-0');
+      exportModalContent.classList.remove('scale-95');
+    }, 10);
+  }
+
+  function closeExportModal() {
+    exportModal.classList.add('opacity-0');
+    exportModalContent.classList.add('scale-95');
+    setTimeout(() => {
+      exportModal.classList.add('hidden');
+      copyExportText.textContent = 'Copy Code';
+    }, 300);
+  }
+
+  exportTailwindBtn.addEventListener('click', () => openExportModal('tailwind'));
+  exportCssBtn.addEventListener('click', () => openExportModal('css'));
+  closeExportBtn.addEventListener('click', closeExportModal);
+  closeExportBtn2.addEventListener('click', closeExportModal);
+  
+  copyExportBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(exportCode.textContent || '');
+    copyExportText.textContent = 'Copied!';
+    setTimeout(() => {
+      copyExportText.textContent = 'Copy Code';
+    }, 2000);
+  });
+
+  // Global Paste Handler for Images
+  window.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile();
+        if (blob) {
+          switchMode('image');
+          handleImageSelect(blob);
+        }
+        break;
+      }
+    }
+  });
 
   // Mode switching
   function switchMode(mode: 'url' | 'image') {
@@ -271,24 +430,71 @@ import '../styles/global.css';
       const extractedText = data.text.trim();
 
       if (extractedText) {
-        resultCount.textContent = `OCR Result • ${Math.round(data.confidence)}% confidence`;
+        // Try to get font name from the OCR results
+        let detectedFont = "Unknown Font";
+        if (data.words && data.words.length > 0) {
+          // Look for a word that has a font name
+          for (const word of data.words) {
+            if (word.font_name && word.font_name !== 'Unknown') {
+              detectedFont = word.font_name.replace(/_/g, ' ');
+              break;
+            }
+          }
+        }
+
+        if (detectedFont !== "Unknown Font") {
+          const fontLink = document.createElement('link');
+          fontLink.href = `https://fonts.googleapis.com/css2?family=${detectedFont.replace(/\s+/g, '+')}&display=swap`;
+          fontLink.rel = 'stylesheet';
+          document.head.appendChild(fontLink);
+          
+          currentFonts = [detectedFont];
+          exportTailwindBtn.classList.remove('hidden');
+          exportCssBtn.classList.remove('hidden');
+        } else {
+          currentFonts = [];
+          exportTailwindBtn.classList.add('hidden');
+          exportCssBtn.classList.add('hidden');
+        }
+
+        resultCount.textContent = `1 Font Detected • ${Math.round(data.confidence)}% confidence`;
         fontsGrid.innerHTML = '';
 
         const card = document.createElement('div');
-        card.className = 'bg-[#121212] border border-[#222] p-6 hover:border-primary transition-colors';
-        card.innerHTML = `
-          <div class="font-mono text-[10px] text-neutral-500 mb-4 uppercase flex justify-between">
-            <span>Extracted Text</span>
-            <span class="text-primary cursor-pointer" id="copyText">Copy</span>
+        card.className = 'bg-[#121212] border border-[#222] p-6 hover:border-primary transition-colors group relative overflow-hidden cursor-pointer';
+        
+        const bgPattern = document.createElement('div');
+        bgPattern.className = 'absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity bg-[radial-gradient(#ff4f00_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none';
+        card.appendChild(bgPattern);
+
+        const fontStyle = detectedFont !== "Unknown Font" ? `style="font-family: '${detectedFont}', sans-serif;"` : 'class="font-mono"';
+
+        card.innerHTML += `
+          <div class="relative z-10">
+            <div class="font-mono text-[10px] text-neutral-500 mb-4 uppercase flex justify-between">
+              <span>Family (Detected)</span>
+              <span class="text-primary hidden group-hover:inline-block">Click to Copy Text</span>
+            </div>
+            <h3 class="font-display text-2xl text-white mb-2 truncate" title="${detectedFont}">${detectedFont}</h3>
+            <p class="text-xl mt-6 line-clamp-3 text-neutral-300" ${fontStyle}>${extractedText}</p>
+            
+            <div class="mt-4 pt-4 border-t border-[#222] flex justify-between items-center">
+              <span class="text-[10px] font-mono text-neutral-600 uppercase">OCR Confidence</span>
+              <span class="text-[10px] font-mono text-primary">${Math.round(data.confidence)}%</span>
+            </div>
           </div>
-          <p class="text-lg text-white font-mono leading-relaxed whitespace-pre-wrap">${extractedText}</p>
         `;
 
-        card.querySelector('#copyText')?.addEventListener('click', () => {
+        card.addEventListener('click', () => {
           navigator.clipboard.writeText(extractedText);
-          const el = card.querySelector('#copyText')!;
-          el.textContent = 'Copied!';
-          setTimeout(() => el.textContent = 'Copy', 1500);
+          const header = card.querySelector('h3');
+          const originalText = header!.textContent;
+          header!.textContent = 'Text Copied!';
+          header!.classList.add('text-primary');
+          setTimeout(() => {
+            header!.textContent = originalText;
+            header!.classList.remove('text-primary');
+          }, 1500);
         });
 
         fontsGrid.appendChild(card);
@@ -331,6 +537,10 @@ import '../styles/global.css';
     errorMessage.classList.add('hidden');
     resultsArea.classList.add('hidden');
     fontsGrid.innerHTML = '';
+    
+    // Hide export buttons during scan
+    exportTailwindBtn.classList.add('hidden');
+    exportCssBtn.classList.add('hidden');
 
     try {
       const response = await fetch('/api/extract', {
@@ -346,6 +556,14 @@ import '../styles/global.css';
       }
 
       if (data.fonts && data.fonts.length > 0) {
+        // Save to history on success
+        addRecentScan(url);
+        
+        // Update currentFonts for export
+        currentFonts = data.fonts;
+        exportTailwindBtn.classList.remove('hidden');
+        exportCssBtn.classList.remove('hidden');
+
         resultCount.textContent = `${data.fonts.length} Fonts Found on ${data.siteTitle || 'Target'}`;
         const displayPreviewText = data.previewText || "The quick brown fox jumps over the lazy dog.";
 

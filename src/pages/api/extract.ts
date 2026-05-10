@@ -74,10 +74,14 @@ export const POST: APIRoute = async ({ request }) => {
       cssLinks.push(cssUrl);
     }
 
-    const cssPromises = cssLinks.slice(0, 2).map(link => {
+    // Scan up to 5 CSS links for better results
+    const cssPromises = cssLinks.slice(0, 5).map(link => {
       const cssController = new AbortController();
-      const cssTimeout = setTimeout(() => cssController.abort(), 3000);
-      return fetch(link, { signal: cssController.signal })
+      const cssTimeout = setTimeout(() => cssController.abort(), 5000); // 5s timeout
+      return fetch(link, { 
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        signal: cssController.signal 
+      })
         .then(res => res.text())
         .catch(() => '')
         .finally(() => clearTimeout(cssTimeout));
@@ -85,6 +89,27 @@ export const POST: APIRoute = async ({ request }) => {
 
     const cssContents = await Promise.all(cssPromises);
     cssContents.forEach(extractFromText);
+
+    // Also look for inline styles
+    const inlineStyleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+    let styleMatch;
+    while ((styleMatch = inlineStyleRegex.exec(html)) !== null) {
+      extractFromText(styleMatch[1]);
+    }
+
+    // Look for style="..." attributes
+    const styleAttrRegex = /style=["']([^"']*)font-family\s*:\s*([^;"']+)["']/gi;
+    let attrMatch;
+    while ((attrMatch = styleAttrRegex.exec(html)) !== null) {
+      const fonts = attrMatch[2].split(',').map(f => f.trim().replace(/['"]/g, ''));
+      fonts.forEach(f => {
+        const lowerF = f.toLowerCase();
+        const isGeneric = ['sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'system-ui', '-apple-system', 'blinkmacsystemfont', 'segoe ui', 'roboto', 'oxygen', 'ubuntu', 'cantarell', 'open sans', 'helvetica neue', 'arial', 'verdana', 'tahoma', 'trebuchet ms', 'times new roman', 'georgia', 'courier new', 'inherit', 'initial', 'unset'].includes(lowerF);
+        if (f && !isGeneric && f.length > 1) {
+          fontFamilies.add(f);
+        }
+      });
+    }
 
     const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
     const pMatch = html.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
