@@ -13,11 +13,20 @@ export const POST: APIRoute = async ({ request }) => {
       validUrl = 'https://' + validUrl;
     }
 
-    const mainResponse = await fetch(validUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      }
-    });
+    let mainResponse;
+    try {
+      mainResponse = await Promise.race([
+        fetch(validUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          },
+          signal: AbortSignal.timeout(10000)
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+      ]) as Response;
+    } catch (err: any) {
+      return new Response(JSON.stringify({ error: 'Failed to fetch URL: ' + (err.message || 'Request timeout') }), { status: 400 });
+    }
 
     if (!mainResponse.ok) {
       return new Response(JSON.stringify({ error: `Failed to fetch the URL: ${mainResponse.statusText}` }), { status: 400 });
@@ -63,9 +72,14 @@ export const POST: APIRoute = async ({ request }) => {
       cssLinks.push(cssUrl);
     }
 
-    // Fetch up to 5 CSS files to avoid timeouts
-    const cssPromises = cssLinks.slice(0, 5).map(link => 
-      fetch(link).then(res => res.text()).catch(() => '')
+    // Fetch up to 3 CSS files to avoid timeouts on serverless
+    const cssPromises = cssLinks.slice(0, 3).map(link =>
+      Promise.race([
+        fetch(link, { signal: AbortSignal.timeout(5000) })
+          .then(res => res.text())
+          .catch(() => ''),
+        new Promise(resolve => setTimeout(() => resolve(''), 5000))
+      ])
     );
     const cssContents = await Promise.all(cssPromises);
     cssContents.forEach(extractFromText);
