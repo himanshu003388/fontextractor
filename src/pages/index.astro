@@ -21,7 +21,7 @@ import '../styles/global.css';
     <!-- Hero -->
     <div class="flex-1 flex flex-col items-center justify-center px-4 py-8 z-10 relative">
       <div class="max-w-5xl w-full">
-        <h1 class="font-display text-4xl sm:text-6xl md:text-7xl font-extrabold leading-none tracking-tight uppercase mb-4">
+        <h1 class="font-display text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-extrabold leading-none tracking-tight uppercase mb-4">
           <span class="block">Extract</span>
           <span class="block text-outline hover-text-filled transition-colors duration-300">Typography</span>
         </h1>
@@ -46,8 +46,18 @@ import '../styles/global.css';
           </div>
         </div>
 
-        <!-- Interactive Form -->
-        <div class="bg-[#121212] border border-[#222] p-1 flex flex-col sm:flex-row gap-1 relative group">
+        <!-- Mode Toggle -->
+        <div class="flex gap-2 mb-4">
+          <button id="urlModeBtn" class="px-4 py-2 text-xs font-mono uppercase tracking-wider bg-white text-black font-display font-bold transition-colors">
+            URL Mode
+          </button>
+          <button id="imageModeBtn" class="px-4 py-2 text-xs font-mono uppercase tracking-wider border border-[#222] text-neutral-400 hover:border-primary hover:text-primary transition-colors font-display">
+            Image Mode
+          </button>
+        </div>
+
+        <!-- URL Extraction Form -->
+        <div id="urlForm" class="bg-[#121212] border border-[#222] p-1 flex flex-col sm:flex-row gap-1 relative group">
           <div class="absolute -inset-0.5 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity blur-lg -z-10"></div>
           <div class="flex-1 flex items-center px-3">
             <span class="font-mono text-neutral-500 mr-2">&gt;</span>
@@ -66,6 +76,35 @@ import '../styles/global.css';
             <svg id="btnIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
             <svg id="loadingIcon" class="w-5 h-5 animate-spin hidden" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
           </button>
+        </div>
+
+        <!-- Image Upload Form -->
+        <div id="imageForm" class="hidden">
+          <div class="bg-[#121212] border border-[#222] p-1 flex flex-col gap-1 relative group">
+            <div class="absolute -inset-0.5 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity blur-lg -z-10"></div>
+            <div id="dropZone" class="border-2 border-dashed border-[#333] hover:border-primary transition-colors p-8 text-center cursor-pointer">
+              <input type="file" id="imageInput" accept="image/*" class="hidden" />
+              <div id="uploadPrompt" class="flex flex-col items-center gap-3">
+                <svg class="w-12 h-12 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20a2 2 0 01-2-2V6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6z"></path>
+                </svg>
+                <p class="font-mono text-sm text-neutral-400">Drop image here or <span class="text-primary">browse</span></p>
+                <p class="font-mono text-xs text-neutral-600">PNG, JPG, WEBP, GIF • Max 10MB</p>
+              </div>
+              <div id="previewContainer" class="hidden">
+                <img id="imagePreview" class="max-h-48 mx-auto rounded mb-3" alt="Preview" />
+                <p id="fileName" class="font-mono text-xs text-neutral-500 truncate"></p>
+              </div>
+            </div>
+            <button
+              id="ocrBtn"
+              class="bg-white hover:bg-primary hover:text-white transition-colors text-black font-display font-bold uppercase tracking-wider px-4 py-3 flex items-center justify-center gap-2 cursor-pointer text-sm"
+            >
+              <span id="ocrBtnText">Extract Text</span>
+              <svg id="ocrBtnIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20a2 2 0 01-2-2V6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6z"></path></svg>
+              <svg id="ocrLoadingIcon" class="w-5 h-5 animate-spin hidden" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </button>
+          </div>
         </div>
 
         <!-- Error State -->
@@ -108,6 +147,165 @@ import '../styles/global.css';
   const fontsGrid = document.getElementById('fontsGrid') as HTMLElement;
   const resultCount = document.getElementById('resultCount') as HTMLElement;
   const errorMessage = document.getElementById('errorMessage') as HTMLElement;
+
+  // Image mode elements
+  const urlModeBtn = document.getElementById('urlModeBtn') as HTMLButtonElement;
+  const imageModeBtn = document.getElementById('imageModeBtn') as HTMLButtonElement;
+  const urlForm = document.getElementById('urlForm') as HTMLElement;
+  const imageForm = document.getElementById('imageForm') as HTMLElement;
+  const dropZone = document.getElementById('dropZone') as HTMLElement;
+  const imageInput = document.getElementById('imageInput') as HTMLInputElement;
+  const uploadPrompt = document.getElementById('uploadPrompt') as HTMLElement;
+  const previewContainer = document.getElementById('previewContainer') as HTMLElement;
+  const imagePreview = document.getElementById('imagePreview') as HTMLImageElement;
+  const fileName = document.getElementById('fileName') as HTMLElement;
+  const ocrBtn = document.getElementById('ocrBtn') as HTMLButtonElement;
+  const ocrBtnText = document.getElementById('ocrBtnText') as HTMLSpanElement;
+  const ocrBtnIcon = document.getElementById('ocrBtnIcon') as HTMLElement;
+  const ocrLoadingIcon = document.getElementById('ocrLoadingIcon') as HTMLElement;
+
+  let selectedImage: File | null = null;
+
+  // Mode switching
+  function switchMode(mode: 'url' | 'image') {
+    if (mode === 'url') {
+      urlModeBtn.classList.add('bg-white', 'text-black');
+      urlModeBtn.classList.remove('border', 'text-neutral-400');
+      imageModeBtn.classList.remove('bg-white', 'text-black', 'border-primary', 'text-primary');
+      imageModeBtn.classList.add('border', 'text-neutral-400');
+      urlForm.classList.remove('hidden');
+      imageForm.classList.add('hidden');
+    } else {
+      imageModeBtn.classList.add('bg-white', 'text-black');
+      imageModeBtn.classList.remove('border', 'text-neutral-400');
+      urlModeBtn.classList.remove('bg-white', 'text-black', 'border-primary', 'text-primary');
+      urlModeBtn.classList.add('border', 'text-neutral-400');
+      urlForm.classList.add('hidden');
+      imageForm.classList.remove('hidden');
+    }
+  }
+
+  urlModeBtn.addEventListener('click', () => switchMode('url'));
+  imageModeBtn.addEventListener('click', () => switchMode('image'));
+
+  // Image handling
+  function handleImageSelect(file: File) {
+    if (!file.type.startsWith('image/')) {
+      showError('Please select a valid image file');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showError('Image too large. Max size: 10MB');
+      return;
+    }
+    selectedImage = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      imagePreview.src = e.target?.result as string;
+      fileName.textContent = file.name;
+      uploadPrompt.classList.add('hidden');
+      previewContainer.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  dropZone.addEventListener('click', () => imageInput.click());
+  imageInput.addEventListener('change', (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (file) handleImageSelect(file);
+  });
+
+  // Drag and drop
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('border-primary');
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('border-primary');
+  });
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('border-primary');
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleImageSelect(file);
+  });
+
+  // OCR extraction
+  async function performOCR() {
+    if (!selectedImage) {
+      showError('Please select an image first');
+      return;
+    }
+
+    ocrBtn.disabled = true;
+    ocrBtnText.textContent = 'Processing...';
+    ocrBtnIcon.classList.add('hidden');
+    ocrLoadingIcon.classList.remove('hidden');
+    errorMessage.classList.add('hidden');
+    resultsArea.classList.add('hidden');
+
+    try {
+      const formData = new FormData();
+      formData.append('image', selectedImage);
+
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to extract text');
+      }
+
+      if (data.extractedText) {
+        resultCount.textContent = `OCR Result • ${Math.round(data.confidence)}% confidence`;
+        fontsGrid.innerHTML = '';
+
+        const card = document.createElement('div');
+        card.className = 'bg-[#121212] border border-[#222] p-6 hover:border-primary transition-colors';
+        card.innerHTML = `
+          <div class="font-mono text-[10px] text-neutral-500 mb-4 uppercase flex justify-between">
+            <span>Extracted Text</span>
+            <span class="text-primary cursor-pointer" id="copyText">Copy</span>
+          </div>
+          <p class="text-lg text-white font-mono leading-relaxed whitespace-pre-wrap">${data.extractedText}</p>
+        `;
+
+        card.querySelector('#copyText')?.addEventListener('click', () => {
+          navigator.clipboard.writeText(data.extractedText);
+          const el = card.querySelector('#copyText')!;
+          el.textContent = 'Copied!';
+          setTimeout(() => el.textContent = 'Copy', 1500);
+        });
+
+        fontsGrid.appendChild(card);
+        resultsArea.classList.remove('hidden');
+      } else {
+        showError('[INFO] No text detected in the image', 'warning');
+      }
+    } catch (error: any) {
+      showError(`[ERROR] ${error.message}`);
+    } finally {
+      ocrBtn.disabled = false;
+      ocrBtnText.textContent = 'Extract Text';
+      ocrLoadingIcon.classList.add('hidden');
+      ocrBtnIcon.classList.remove('hidden');
+    }
+  }
+
+  ocrBtn.addEventListener('click', performOCR);
+
+  function showError(msg: string, type: 'error' | 'warning' = 'error') {
+    errorMessage.textContent = msg;
+    errorMessage.classList.remove('hidden', 'text-red-500', 'text-yellow-500', 'border-red-500/30', 'border-yellow-500/30', 'bg-red-500/10', 'bg-yellow-500/10');
+    if (type === 'warning') {
+      errorMessage.classList.add('text-yellow-500', 'border-yellow-500/30', 'bg-yellow-500/10');
+    } else {
+      errorMessage.classList.add('text-red-500', 'border-red-500/30', 'bg-red-500/10');
+    }
+  }
 
   async function performExtraction() {
     const url = input.value.trim();
@@ -183,20 +381,12 @@ import '../styles/global.css';
 
         resultsArea.classList.remove('hidden');
       } else {
-        errorMessage.textContent = '[INFO] No custom fonts detected at coordinates.';
-        errorMessage.classList.remove('hidden');
-        errorMessage.classList.replace('text-red-500', 'text-yellow-500');
-        errorMessage.classList.replace('border-red-500/30', 'border-yellow-500/30');
-        errorMessage.classList.replace('bg-red-500/10', 'bg-yellow-500/10');
+        showError('[INFO] No custom fonts detected at coordinates.', 'warning');
       }
 
     } catch (error: any) {
       console.error(error);
-      errorMessage.textContent = `[ERROR] ${error.message}`;
-      errorMessage.classList.remove('hidden');
-      errorMessage.classList.replace('text-yellow-500', 'text-red-500');
-      errorMessage.classList.replace('border-yellow-500/30', 'border-red-500/30');
-      errorMessage.classList.replace('bg-yellow-500/10', 'bg-red-500/10');
+      showError(`[ERROR] ${error.message}`);
     } finally {
       // Reset UI
       btn.disabled = false;
