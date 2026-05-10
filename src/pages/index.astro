@@ -248,10 +248,17 @@ import '../styles/global.css';
       const formData = new FormData();
       formData.append('image', selectedImage);
 
+      // Add timeout for the fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const response = await fetch('/api/ocr', {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -286,7 +293,11 @@ import '../styles/global.css';
         showError('[INFO] No text detected in the image', 'warning');
       }
     } catch (error: any) {
-      showError(`[ERROR] ${error.message}`);
+      if (error.name === 'AbortError') {
+        showError('OCR processing timeout. Try a smaller image.');
+      } else {
+        showError(`[ERROR] ${error.message}`);
+      }
     } finally {
       ocrBtn.disabled = false;
       ocrBtnText.textContent = 'Extract Text';

@@ -13,7 +13,6 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Validate file size (max 10MB)
     if (imageFile.size > 10 * 1024 * 1024) {
       return new Response(JSON.stringify({ error: 'Image too large. Max size: 10MB' }), {
         status: 400,
@@ -21,39 +20,44 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Convert file to base64 directly
     const arrayBuffer = await imageFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const mimeType = imageFile.type || 'image/png';
     const base64Image = buffer.toString('base64');
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    // Perform OCR using Tesseract.js
-    const result = await Tesseract.recognize(dataUrl, 'eng', {
-      logger: () => {} // Suppress logs in production
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const extractedText = result.data.text.trim();
+    try {
+      const result = await Tesseract.recognize(dataUrl, 'eng', {
+        coreThreshold: 0,
+        cacheMethod: 'indexedDB',
+      }, { signal: controller.signal });
 
-    if (!extractedText) {
+      clearTimeout(timeoutId);
+
+      const extractedText = result.data.text.trim();
+
       return new Response(JSON.stringify({
-        message: 'No text detected in the image',
+        extractedText: extractedText || '',
         confidence: Math.round(result.data.confidence),
-        extractedText: ''
+        message: extractedText ? 'Text extracted from image' : 'No text detected in the image'
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
-    }
 
-    return new Response(JSON.stringify({
-      extractedText,
-      confidence: Math.round(result.data.confidence),
-      message: 'Text extracted from image'
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        return new Response(JSON.stringify({ error: 'OCR processing timeout. Try a smaller image.' }), {
+          status: 408,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      throw err;
+    }
 
   } catch (error: any) {
     console.error('OCR Error:', error);
