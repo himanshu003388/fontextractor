@@ -23,11 +23,10 @@ export const POST: APIRoute = async ({ request }) => {
     const buffer = Buffer.from(arrayBuffer);
     const mimeType = imageFile.type || 'image/png';
     const base64Image = buffer.toString('base64');
-    const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
     return new Response(JSON.stringify({
-      dataUrl,
-      message: 'Image received'
+      imageData: `data:${mimeType};base64,${base64Image}`,
+      success: true
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

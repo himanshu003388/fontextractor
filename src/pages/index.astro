@@ -5,7 +5,7 @@ import '../styles/global.css';
 
 <Layout title="Fontextractor [v1.0.0]">
   <div class="noise-overlay"></div>
-  
+
   <main class="min-h-screen bg-grid-industrial relative flex flex-col">
     <!-- Header -->
     <header class="p-6 border-b border-[#222] flex justify-between items-center bg-[#050505]/80 backdrop-blur-md sticky top-0 z-40">
@@ -118,7 +118,7 @@ import '../styles/global.css';
             <h2 class="font-display text-2xl font-bold uppercase tracking-tight">Extracted Data</h2>
             <span id="resultCount" class="font-mono text-sm text-primary border border-primary px-3 py-1 bg-primary/10">0 Fonts Found</span>
           </div>
-          
+
           <div id="fontsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- Font cards will be injected here -->
           </div>
@@ -138,6 +138,9 @@ import '../styles/global.css';
 </Layout>
 
 <script>
+  // @ts-ignore
+  import { createWorker, PSM } from 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.mjs';
+
   const input = document.getElementById('urlInput') as HTMLInputElement;
   const btn = document.getElementById('extractBtn') as HTMLButtonElement;
   const btnText = document.getElementById('btnText') as HTMLSpanElement;
@@ -230,7 +233,7 @@ import '../styles/global.css';
     if (file) handleImageSelect(file);
   });
 
-  // OCR extraction
+  // OCR extraction using Tesseract.js in browser
   async function performOCR() {
     if (!selectedImage) {
       showError('Please select an image first');
@@ -245,28 +248,29 @@ import '../styles/global.css';
     resultsArea.classList.add('hidden');
 
     try {
-      const formData = new FormData();
-      formData.append('image', selectedImage);
-
-      // Add timeout for the fetch request
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      const response = await fetch('/api/ocr', {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal
+      // Convert file to base64 data URL
+      const reader = new FileReader();
+      const imageDataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(selectedImage);
       });
 
-      clearTimeout(timeoutId);
+      // Create Tesseract worker
+      const worker = await createWorker('eng', 1, {
+        logger: (m: any) => {
+          if (m.status === 'recognizing text') {
+            ocrBtnText.textContent = `${Math.round(m.progress * 100)}%`;
+          }
+        }
+      });
 
-      const data = await response.json();
+      const { data } = await worker.recognize(imageDataUrl);
+      await worker.terminate();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to extract text');
-      }
+      const extractedText = data.text.trim();
 
-      if (data.extractedText) {
+      if (extractedText) {
         resultCount.textContent = `OCR Result • ${Math.round(data.confidence)}% confidence`;
         fontsGrid.innerHTML = '';
 
@@ -277,11 +281,11 @@ import '../styles/global.css';
             <span>Extracted Text</span>
             <span class="text-primary cursor-pointer" id="copyText">Copy</span>
           </div>
-          <p class="text-lg text-white font-mono leading-relaxed whitespace-pre-wrap">${data.extractedText}</p>
+          <p class="text-lg text-white font-mono leading-relaxed whitespace-pre-wrap">${extractedText}</p>
         `;
 
         card.querySelector('#copyText')?.addEventListener('click', () => {
-          navigator.clipboard.writeText(data.extractedText);
+          navigator.clipboard.writeText(extractedText);
           const el = card.querySelector('#copyText')!;
           el.textContent = 'Copied!';
           setTimeout(() => el.textContent = 'Copy', 1500);
@@ -293,11 +297,8 @@ import '../styles/global.css';
         showError('[INFO] No text detected in the image', 'warning');
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        showError('OCR processing timeout. Try a smaller image.');
-      } else {
-        showError(`[ERROR] ${error.message}`);
-      }
+      console.error('OCR Error:', error);
+      showError(`[ERROR] ${error.message || 'Failed to process image'}`);
     } finally {
       ocrBtn.disabled = false;
       ocrBtnText.textContent = 'Extract Text';
@@ -347,18 +348,16 @@ import '../styles/global.css';
       if (data.fonts && data.fonts.length > 0) {
         resultCount.textContent = `${data.fonts.length} Fonts Found on ${data.siteTitle || 'Target'}`;
         const displayPreviewText = data.previewText || "The quick brown fox jumps over the lazy dog.";
-        
+
         data.fonts.forEach((font: string) => {
           const cleanFont = font.replace(/["']/g, '');
           const card = document.createElement('div');
           card.className = 'bg-[#121212] border border-[#222] p-6 hover:border-primary transition-colors group relative overflow-hidden cursor-pointer';
-          
-          // Add a subtle tech pattern to the card background
+
           const bgPattern = document.createElement('div');
           bgPattern.className = 'absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity bg-[radial-gradient(#ff4f00_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none';
           card.appendChild(bgPattern);
 
-          // Attempt to load the font via Google Fonts
           const fontLink = document.createElement('link');
           fontLink.href = `https://fonts.googleapis.com/css2?family=${cleanFont.replace(/\s+/g, '+')}&display=swap`;
           fontLink.rel = 'stylesheet';
@@ -399,7 +398,6 @@ import '../styles/global.css';
       console.error(error);
       showError(`[ERROR] ${error.message}`);
     } finally {
-      // Reset UI
       btn.disabled = false;
       btnText.textContent = 'Initiate Scan';
       loadingIcon.classList.add('hidden');
