@@ -70,7 +70,6 @@ import '../styles/global.css';
           </div>
           <button
             id="extractBtn"
-            onclick="try { window.performExtraction && window.performExtraction(); } catch(e) { console.error('Click error:', e); alert('Error: ' + e.message); }"
             class="bg-white hover:bg-primary hover:text-white transition-colors text-black font-display font-bold uppercase tracking-wider px-4 py-3 flex items-center justify-center gap-2 cursor-pointer text-sm"
           >
             <span id="btnText">Scan</span>
@@ -938,7 +937,7 @@ import '../styles/global.css';
   const imageInput = document.getElementById('imageInput') as HTMLInputElement;
   const uploadPrompt = document.getElementById('uploadPrompt') as HTMLElement;
   const previewContainer = document.getElementById('previewContainer') as HTMLElement;
-  const imagePreview = document.getElementById('imagePreview') as HTMLImageElement;
+  const originalImagePreview = document.getElementById('originalImagePreview') as HTMLImageElement;
   const fileName = document.getElementById('fileName') as HTMLElement;
   const ocrBtn = document.getElementById('ocrBtn') as HTMLButtonElement;
   const ocrBtnText = document.getElementById('ocrBtnText') as HTMLSpanElement;
@@ -979,7 +978,6 @@ import '../styles/global.css';
 
   // New UI elements
   const imagePreviewContainer = document.getElementById('imagePreviewContainer') as HTMLElement;
-  const originalImagePreview = document.getElementById('originalImagePreview') as HTMLImageElement;
   const boundingBoxesCanvas = document.getElementById('boundingBoxesCanvas') as HTMLCanvasElement;
   const toggleOverlayBtn = document.getElementById('toggleOverlayBtn') as HTMLButtonElement;
   const manualCropBtn = document.getElementById('manualCropBtn') as HTMLButtonElement;
@@ -1029,6 +1027,9 @@ import '../styles/global.css';
   const exportCode = document.getElementById('exportCode') as HTMLElement;
   const copyExportBtn = document.getElementById('copyExportBtn') as HTMLButtonElement;
   const copyExportText = document.getElementById('copyExportText') as HTMLElement;
+
+  // Expose performExtraction to window
+  (window as any).performExtraction = performExtraction;
 
   // URL Mode font filtering and sorting
   let urlModeFonts: { font: string, isGoogleFont: boolean }[] = [];
@@ -1139,13 +1140,15 @@ import '../styles/global.css';
 
         navigator.clipboard.writeText(`font-family: '${cleanFont}';`);
         const header = card.querySelector('h3');
-        const originalText = header!.textContent;
-        header!.textContent = 'Copied!';
-        header!.classList.add('text-primary');
-        setTimeout(() => {
-          header!.textContent = originalText;
-          header!.classList.remove('text-primary');
-        }, 1500);
+        if (header) {
+          const originalText = header.textContent;
+          header.textContent = 'Copied!';
+          header.classList.add('text-primary');
+          setTimeout(() => {
+            header.textContent = originalText;
+            header.classList.remove('text-primary');
+          }, 1500);
+        }
       });
 
       copyBtn.addEventListener('click', (e) => {
@@ -2153,18 +2156,24 @@ import '../styles/global.css';
       // Match fonts
       updateProgress('Matching fonts...', 90);
 
-      const textRegionsWithImageData = ocrResultsRaw.map(result => {
+      const textRegionsWithImageData = await Promise.all(ocrResultsRaw.map(async (result) => {
         const regionCanvas = document.createElement('canvas');
         regionCanvas.width = result.region.width;
         regionCanvas.height = result.region.height;
         const ctx = regionCanvas.getContext('2d')!;
+        
         const imgObj = new Image();
         imgObj.src = result.region.imageData;
+        await new Promise((resolve) => {
+          imgObj.onload = resolve;
+          imgObj.onerror = resolve; // Continue even if error
+        });
+        
         ctx.drawImage(imgObj, 0, 0);
         const imageData = ctx.getImageData(0, 0, regionCanvas.width, regionCanvas.height);
 
         return { imageData, text: result.text };
-      });
+      }));
 
       const fontMatches = await matchFonts(textRegionsWithImageData);
 
@@ -2293,13 +2302,15 @@ import '../styles/global.css';
         card.addEventListener('click', () => {
           navigator.clipboard.writeText(extractedText);
           const header = card.querySelector('h3');
-          const originalText = header!.textContent;
-          header!.textContent = 'Text Copied!';
-          header!.classList.add('text-primary');
-          setTimeout(() => {
-            header!.textContent = originalText;
-            header!.classList.remove('text-primary');
-          }, 1500);
+          if (header) {
+            const originalText = header.textContent;
+            header.textContent = 'Text Copied!';
+            header.classList.add('text-primary');
+            setTimeout(() => {
+              header.textContent = originalText;
+              header.classList.remove('text-primary');
+            }, 1500);
+          }
         });
 
         fontsGrid.appendChild(card);
@@ -2318,15 +2329,17 @@ import '../styles/global.css';
     }
   }
 
-  ocrBtn.addEventListener('click', performFullExtraction);
+  if (ocrBtn) ocrBtn.addEventListener('click', performFullExtraction);
 
-  rerunDetectionBtn.addEventListener('click', async () => {
-    if (processedImageCanvas && originalImageCanvas) {
-      const regions = await detectTextRegions(processedImageCanvas, originalImageCanvas);
-      detectedTextRegions = regions;
-      displayDetectedRegions(regions);
-    }
-  });
+  if (rerunDetectionBtn) {
+    rerunDetectionBtn.addEventListener('click', async () => {
+      if (processedImageCanvas && originalImageCanvas) {
+        const regions = await detectTextRegions(processedImageCanvas, originalImageCanvas);
+        detectedTextRegions = regions;
+        displayDetectedRegions(regions);
+      }
+    });
+  }
 
   function showError(msg: string, type: 'error' | 'warning' = 'error') {
     errorMessage.textContent = msg;
@@ -2341,12 +2354,11 @@ import '../styles/global.css';
   async function performExtraction() {
     const url = input.value.trim();
     if (!url) {
-      alert('Please enter a URL');
+      showError('Please enter a URL');
       return;
     }
 
     console.log('performExtraction called, url:', url);
-    alert('Starting scan for: ' + url);
 
     btn.disabled = true;
     btnText.textContent = 'Scanning...';
@@ -2464,9 +2476,9 @@ import '../styles/global.css';
     }
   }, 100);
 
-  // Initial log to confirm script loaded
-  console.log('Fontextractor script loaded successfully');
-
   // Expose performExtraction to window for inline onclick
   (window as any).performExtraction = performExtraction;
+
+  // Initial log to confirm script loaded
+  console.log('Fontextractor script loaded successfully');
 </script>
