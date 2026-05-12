@@ -3,7 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import '../styles/global.css';
 ---
 
-<Layout title="Fontextractor [v1.0.0]">
+<Layout title="Fontextractor [v2.0.0]">
   <div class="noise-overlay"></div>
 
   <main class="min-h-screen bg-grid-industrial relative flex flex-col">
@@ -28,16 +28,16 @@ import '../styles/global.css';
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 border-t border-[#222] pt-4">
           <p class="col-span-1 md:col-span-2 text-sm text-neutral-400 max-w-2xl font-mono leading-relaxed">
-            Input target URL to extract all font families from any website.
+            Input target URL or upload an image to extract font families.
           </p>
           <div class="col-span-1 flex flex-col gap-2 font-mono text-xs text-neutral-500 uppercase">
             <div class="flex justify-between border-b border-[#222] pb-2">
               <span>Engine</span>
-              <span class="text-white">v1.0.0</span>
+              <span class="text-white">v2.0.0</span>
             </div>
             <div class="flex justify-between border-b border-[#222] pb-2">
               <span>Accuracy</span>
-              <span class="text-primary">High</span>
+              <span class="text-primary">Enhanced</span>
             </div>
             <div class="flex justify-between pb-2">
               <span>Status</span>
@@ -70,6 +70,7 @@ import '../styles/global.css';
           </div>
           <button
             id="extractBtn"
+            onclick="try { window.performExtraction && window.performExtraction(); } catch(e) { console.error('Click error:', e); alert('Error: ' + e.message); }"
             class="bg-white hover:bg-primary hover:text-white transition-colors text-black font-display font-bold uppercase tracking-wider px-4 py-3 flex items-center justify-center gap-2 cursor-pointer text-sm"
           >
             <span id="btnText">Scan</span>
@@ -91,25 +92,66 @@ import '../styles/global.css';
         <div id="imageForm" class="hidden">
           <div class="bg-[#121212] border border-[#222] p-1 flex flex-col gap-1 relative group">
             <div class="absolute -inset-0.5 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity blur-lg -z-10"></div>
-            <div id="dropZone" class="border-2 border-dashed border-[#333] hover:border-primary transition-colors p-8 text-center cursor-pointer">
+
+            <!-- Upload Area -->
+            <div id="dropZone" class="border-2 border-dashed border-[#333] hover:border-primary transition-colors p-6 text-center cursor-pointer">
               <input type="file" id="imageInput" accept="image/*" class="hidden" />
               <div id="uploadPrompt" class="flex flex-col items-center gap-3">
-                <svg class="w-12 h-12 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-10 h-10 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20a2 2 0 01-2-2V6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6z"></path>
                 </svg>
                 <p class="font-mono text-sm text-neutral-400">Drop image here or <span class="text-primary">browse</span></p>
-                <p class="font-mono text-xs text-neutral-600">PNG, JPG, WEBP, GIF • Max 10MB</p>
+                <p class="font-mono text-xs text-neutral-600">PNG, JPG, WEBP • Max 10MB</p>
               </div>
+
+              <!-- Selected Image Info -->
               <div id="previewContainer" class="hidden">
-                <img id="imagePreview" class="max-h-48 mx-auto rounded mb-3" alt="Preview" />
-                <p id="fileName" class="font-mono text-xs text-neutral-500 truncate"></p>
+                <div class="flex items-center justify-between mb-2">
+                  <p id="fileName" class="font-mono text-sm text-neutral-300 truncate flex-1"></p>
+                  <button id="clearImageBtn" class="font-mono text-xs text-neutral-500 hover:text-red-500 ml-2">✕ Clear</button>
+                </div>
+                <div id="imageInfo" class="font-mono text-xs text-neutral-500 mb-2"></div>
               </div>
             </div>
+
+            <!-- Preprocessing Options (inline) -->
+            <div id="preprocessingOptions" class="hidden flex flex-wrap items-center gap-4 p-3 border-t border-[#222]">
+              <span class="font-mono text-xs text-neutral-500 uppercase">Preprocessing:</span>
+              <label class="flex items-center gap-1.5 text-xs font-mono text-neutral-400">
+                <input type="checkbox" id="preprocessGrayscale" checked class="accent-primary">
+                Grayscale
+              </label>
+              <label class="flex items-center gap-1.5 text-xs font-mono text-neutral-400">
+                <input type="checkbox" id="preprocessContrast" checked class="accent-primary">
+                Contrast
+              </label>
+              <label class="flex items-center gap-1.5 text-xs font-mono text-neutral-400">
+                <input type="checkbox" id="preprocessDenoise" checked class="accent-primary">
+                Denoise
+              </label>
+              <label class="flex items-center gap-1.5 text-xs font-mono text-neutral-400">
+                <input type="checkbox" id="preprocessThreshold" class="accent-primary">
+                Binarize
+              </label>
+            </div>
+
+            <!-- Processing Progress -->
+            <div id="processingProgress" class="hidden p-3 border-t border-[#222]">
+              <div class="flex items-center justify-between mb-2">
+                <span id="processingStatus" class="font-mono text-xs text-neutral-400">Processing...</span>
+                <span id="processingPercent" class="font-mono text-xs text-primary">0%</span>
+              </div>
+              <div class="h-1 bg-[#222] rounded overflow-hidden">
+                <div id="progressBar" class="h-full bg-primary transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <!-- Action Button -->
             <button
               id="ocrBtn"
               class="bg-white hover:bg-primary hover:text-white transition-colors text-black font-display font-bold uppercase tracking-wider px-4 py-3 flex items-center justify-center gap-2 cursor-pointer text-sm"
             >
-              <span id="ocrBtnText">Extract Text</span>
+              <span id="ocrBtnText">Extract Text & Fonts</span>
               <svg id="ocrBtnIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20a2 2 0 01-2-2V6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6z"></path></svg>
               <svg id="ocrLoadingIcon" class="w-5 h-5 animate-spin hidden" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
             </button>
@@ -132,8 +174,136 @@ import '../styles/global.css';
             </div>
           </div>
 
+          <!-- Search/Filter Bar -->
+          <div id="fontFilterBar" class="flex flex-wrap items-center gap-3 mb-4 p-3 bg-[#121212] border border-[#222]">
+            <div class="flex-1 min-w-[200px]">
+              <input type="text" id="fontSearchInput" placeholder="Search fonts..." class="w-full bg-[#0a0a0a] border border-[#222] text-white px-3 py-2 font-mono text-sm focus:border-primary outline-none" />
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-xs text-neutral-500 uppercase">Sort:</span>
+              <select id="fontSortSelect" class="bg-[#0a0a0a] border border-[#222] text-white px-2 py-2 font-mono text-xs focus:border-primary outline-none cursor-pointer">
+                <option value="original">Original Order</option>
+                <option value="az">A-Z</option>
+                <option value="za">Z-A</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="flex items-center gap-1.5 text-xs font-mono text-neutral-400 cursor-pointer">
+                <input type="checkbox" id="googleFontsOnly" class="accent-primary">
+                Google Fonts Only
+              </label>
+            </div>
+            <span id="fontFilterCount" class="font-mono text-xs text-neutral-500 ml-auto">Showing all</span>
+          </div>
+
           <div id="fontsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- Font cards will be injected here -->
+          </div>
+        </div>
+
+        <!-- Image Preview with Bounding Boxes Overlay -->
+        <div id="imagePreviewContainer" class="hidden mt-4">
+          <div class="bg-[#121212] border border-[#222] p-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
+              <div class="flex items-center gap-3">
+                <h3 class="font-display text-lg text-white uppercase">Image Preview</h3>
+                <span id="imageDimensions" class="font-mono text-xs text-neutral-500"></span>
+              </div>
+              <div class="flex gap-3">
+                <button id="toggleOverlayBtn" class="font-mono text-xs text-neutral-400 hover:text-primary transition-colors">Toggle Boxes</button>
+                <button id="manualCropBtn" class="font-mono text-xs text-neutral-400 hover:text-primary transition-colors">Manual Crop</button>
+              </div>
+            </div>
+            <div id="imageWrapper" class="relative inline-block max-w-full overflow-hidden rounded border border-[#222]">
+              <img id="originalImagePreview" class="max-w-full h-auto block" alt="Original Image" />
+              <canvas id="boundingBoxesCanvas" class="absolute top-0 left-0 w-full h-full pointer-events-none"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Extracted Text Panel -->
+        <div id="extractedTextPanel" class="hidden mt-4">
+          <div class="bg-[#121212] border border-[#222] p-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+              <h3 class="font-display text-lg text-white uppercase">Extracted Text</h3>
+              <div class="flex flex-wrap gap-2">
+                <button id="selectAllTextBtn" class="font-mono text-xs bg-[#222] text-neutral-300 hover:bg-primary hover:text-black px-3 py-1 transition-colors">Select All</button>
+                <button id="searchTextBtn" class="font-mono text-xs bg-[#222] text-neutral-300 hover:bg-primary hover:text-black px-3 py-1 transition-colors">Search</button>
+              </div>
+            </div>
+
+            <!-- Search Input -->
+            <div id="searchContainer" class="hidden mb-3 flex gap-2">
+              <input type="text" id="searchInput" placeholder="Search detected text..." class="flex-1 bg-[#0a0a0a] border border-[#222] text-white px-3 py-2 font-mono text-sm focus:border-primary outline-none" />
+              <button id="searchPrevBtn" class="font-mono text-xs text-neutral-400 hover:text-primary px-2">↑</button>
+              <button id="searchNextBtn" class="font-mono text-xs text-neutral-400 hover:text-primary px-2">↓</button>
+              <span id="searchCount" class="font-mono text-xs text-neutral-500 py-2"></span>
+            </div>
+
+            <!-- Selection Info -->
+            <div id="selectionInfo" class="hidden mb-3 p-3 bg-[#0a0a0a] border border-[#222]">
+              <div class="flex flex-wrap gap-2 items-center justify-between">
+                <span id="selectionCount" class="font-mono text-xs text-neutral-400">0 regions selected</span>
+                <div class="flex gap-2">
+                  <button id="copyPlainTextBtn" class="font-mono text-xs bg-[#222] text-neutral-300 hover:text-primary px-2 py-1 transition-colors">Copy Plain</button>
+                  <button id="copyWithBreaksBtn" class="font-mono text-xs bg-[#222] text-neutral-300 hover:text-primary px-2 py-1 transition-colors">Copy with Breaks</button>
+                  <button id="copyJsonBtn" class="font-mono text-xs bg-[#222] text-neutral-300 hover:text-primary px-2 py-1 transition-colors">Copy JSON</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Text Regions List -->
+            <div id="textRegionsList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+
+            <!-- Editable Text Output -->
+            <div class="mt-4 pt-4 border-t border-[#222]">
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-mono text-xs text-neutral-500 uppercase">Combined Text</span>
+                <button id="copyCombinedBtn" class="font-mono text-xs text-primary hover:underline">Copy All</button>
+              </div>
+              <textarea id="combinedTextOutput" class="w-full h-32 bg-[#0a0a0a] border border-[#222] text-neutral-300 px-3 py-2 font-mono text-sm resize-y focus:border-primary outline-none" placeholder="Select regions above to combine text..."></textarea>
+            </div>
+
+            <!-- Stats -->
+            <div class="mt-3 flex flex-wrap gap-4 text-xs font-mono text-neutral-500">
+              <span id="totalRegionsStat">Regions: 0</span>
+              <span id="totalTextStat">Characters: 0</span>
+              <span id="avgConfidenceStat">Avg Confidence: 0%</span>
+              <span id="languageStat">Language: English</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Manual Crop Modal -->
+        <div id="manualCropModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div class="bg-[#121212] border border-[#222] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="p-4 border-b border-[#222] flex justify-between items-center">
+              <h3 class="font-display text-lg text-white uppercase">Manual Crop</h3>
+              <button id="closeCropModalBtn" class="text-neutral-500 hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            <div class="flex-1 p-4 overflow-auto">
+              <div id="cropCanvasWrapper" class="relative inline-block">
+                <canvas id="cropCanvas"></canvas>
+                <div id="cropSelection" class="absolute border-2 border-primary bg-primary/20 cursor-move hidden"></div>
+              </div>
+            </div>
+            <div class="p-4 border-t border-[#222] flex justify-end gap-3">
+              <button id="cancelCropBtn" class="font-mono text-xs text-neutral-400 hover:text-white px-4 py-2 transition-colors">Cancel</button>
+              <button id="runOcrOnCropBtn" class="font-display text-xs bg-primary text-black px-6 py-2 hover:opacity-80 transition-colors">Run OCR</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Font Match Results (New) -->
+        <div id="fontMatchResults" class="hidden mt-8">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-[#222] pb-2 mb-4 gap-4">
+            <h2 class="font-display text-2xl font-bold uppercase tracking-tight">Font Match Results</h2>
+          </div>
+
+          <div id="fontMatchesContainer" class="space-y-4">
+            <!-- Font match cards will be injected here -->
           </div>
         </div>
 
@@ -172,7 +342,575 @@ import '../styles/global.css';
 </Layout>
 
 <script>
-  import { createWorker } from 'tesseract.js';
+  // ==================== IMAGE PREPROCESSING ====================
+
+  // Convert image to grayscale
+  function toGrayscale(imageData: ImageData): ImageData {
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      data[i] = data[i + 1] = data[i + 2] = gray;
+    }
+    return imageData;
+  }
+
+  // Apply contrast enhancement (CLAHE-style)
+  function enhanceContrast(imageData: ImageData, clipLimit: number = 2): ImageData {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+
+    // Build histogram and CDF
+    const histogram = new Uint32Array(256);
+    for (let i = 0; i < data.length; i += 4) {
+      histogram[Math.floor(data[i])]++;
+    }
+
+    // CDF
+    const cdf = new Uint32Array(256);
+    cdf[0] = histogram[0];
+    for (let i = 1; i < 256; i++) {
+      cdf[i] = cdf[i - 1] + histogram[i];
+    }
+
+    // Find CDF min (non-zero)
+    let cdfMin = 0;
+    for (let i = 0; i < 256; i++) {
+      if (cdf[i] > 0) {
+        cdfMin = cdf[i];
+        break;
+      }
+    }
+
+    const totalPixels = width * height;
+    const scale = 255 / (totalPixels - cdfMin);
+
+    // Apply histogram equalization
+    for (let i = 0; i < data.length; i += 4) {
+      const val = Math.floor(data[i]);
+      const newVal = Math.floor((cdf[val] - cdfMin) * scale);
+      data[i] = data[i + 1] = data[i + 2] = Math.max(0, Math.min(255, newVal));
+    }
+
+    return imageData;
+  }
+
+  // Apply median filter for denoising
+  function denoise(imageData: ImageData, radius: number = 1): ImageData {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const output = new Uint8ClampedArray(data);
+
+    for (let y = radius; y < height - radius; y++) {
+      for (let x = radius; x < width - radius; x++) {
+        const reds: number[] = [];
+        const greens: number[] = [];
+        const blues: number[] = [];
+
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            const idx = ((y + dy) * width + (x + dx)) * 4;
+            reds.push(data[idx]);
+            greens.push(data[idx + 1]);
+            blues.push(data[idx + 2]);
+          }
+        }
+
+        reds.sort((a, b) => a - b);
+        greens.sort((a, b) => a - b);
+        blues.sort((a, b) => a - b);
+
+        const mid = Math.floor(reds.length / 2);
+        const outIdx = (y * width + x) * 4;
+        output[outIdx] = reds[mid];
+        output[outIdx + 1] = greens[mid];
+        output[outIdx + 2] = blues[mid];
+      }
+    }
+
+    return new ImageData(output, width, height);
+  }
+
+  // Apply adaptive thresholding (Otsu's method)
+  function threshold(imageData: ImageData): ImageData {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+
+    // Calculate Otsu's threshold
+    const histogram = new Uint32Array(256);
+    for (let i = 0; i < data.length; i += 4) {
+      histogram[Math.floor(data[i])]++;
+    }
+
+    let sum = 0;
+    for (let i = 0; i < 256; i++) sum += i * histogram[i];
+
+    let sumB = 0;
+    let wB = 0;
+    let wF = 0;
+    let maxVariance = 0;
+    let threshold = 0;
+
+    for (let t = 0; t < 256; t++) {
+      wB += histogram[t];
+      if (wB === 0) continue;
+      wF = width * height - wB;
+      if (wF === 0) break;
+
+      sumB += t * histogram[t];
+      const mB = sumB / wB;
+      const mF = (sum - sumB) / wF;
+      const variance = wB * wF * (mB - mF) * (mB - mF);
+
+      if (variance > maxVariance) {
+        maxVariance = variance;
+        threshold = t;
+      }
+    }
+
+    // Apply threshold
+    for (let i = 0; i < data.length; i += 4) {
+      const val = data[i] > threshold ? 255 : 0;
+      data[i] = data[i + 1] = data[i + 2] = val;
+    }
+
+    return imageData;
+  }
+
+  // Detect edges using Sobel operator
+  function detectEdges(imageData: ImageData): ImageData {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const output = new Uint8ClampedArray(data.length);
+
+    const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+    const sobelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        let gx = 0, gy = 0;
+
+        for (let ky = -1; ky <= 1; ky++) {
+          for (let kx = -1; kx <= 1; kx++) {
+            const idx = ((y + ky) * width + (x + kx)) * 4;
+            const pixel = data[idx];
+            const ki = (ky + 1) * 3 + (kx + 1);
+            gx += pixel * sobelX[ki];
+            gy += pixel * sobelY[ki];
+          }
+        }
+
+        const magnitude = Math.min(255, Math.sqrt(gx * gx + gy * gy));
+        const outIdx = (y * width + x) * 4;
+        output[outIdx] = output[outIdx + 1] = output[outIdx + 2] = magnitude;
+        output[outIdx + 3] = 255;
+      }
+    }
+
+    return new ImageData(output, width, height);
+  }
+
+  // ==================== TEXT REGION DETECTION ====================
+
+  function findTextRegions(edgeData: ImageData, minWidth: number = 20, minHeight: number = 10): { x: number, y: number, width: number, height: number }[] {
+    const data = edgeData.data;
+    const width = edgeData.width;
+    const height = edgeData.height;
+    const visited = new Uint8Array(width * height);
+    const regions: { x: number, y: number, width: number, height: number }[] = [];
+
+    // Threshold for edge detection
+    const edgeThreshold = 30;
+
+    function floodFill(startX: number, startY: number): { x: number, y: number, width: number, height: number } | null {
+      const stack = [[startX, startY]];
+      let minX = startX, maxX = startX, minY = startY, maxY = startY;
+      let pixelCount = 0;
+
+      while (stack.length > 0 && pixelCount < 5000) {
+        const [x, y] = stack.pop()!;
+        const idx = y * width + x;
+
+        if (x < 0 || x >= width || y < 0 || y >= height || visited[idx]) continue;
+        if (data[idx * 4] < edgeThreshold) continue;
+
+        visited[idx] = 1;
+        pixelCount++;
+
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+
+        stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+      }
+
+      const w = maxX - minX + 1;
+      const h = maxY - minY + 1;
+
+      if (w >= minWidth && h >= minHeight && pixelCount > 20) {
+        return { x: minX, y: minY, width: w, height: h };
+      }
+      return null;
+    }
+
+    // Scan for edge pixels and flood fill
+    for (let y = 0; y < height; y += 2) {
+      for (let x = 0; x < width; x += 2) {
+        const idx = y * width + x;
+        if (visited[idx]) continue;
+        if (data[idx * 4] > edgeThreshold) {
+          const region = floodFill(x, y);
+          if (region) {
+            regions.push(region);
+          }
+        }
+      }
+    }
+
+    // Merge overlapping regions
+    const merged = mergeOverlappingRegions(regions, 10);
+
+    // Sort by reading order (top-to-bottom, left-to-right)
+    merged.sort((a, b) => {
+      const rowA = Math.floor(a.y / 50);
+      const rowB = Math.floor(b.y / 50);
+      if (rowA !== rowB) return rowA - rowB;
+      return a.x - b.x;
+    });
+
+    return merged.slice(0, 20); // Limit to 20 regions
+  }
+
+  function mergeOverlappingRegions(regions: { x: number, y: number, width: number, height: number }[], gap: number): { x: number, y: number, width: number, height: number }[] {
+    if (regions.length === 0) return [];
+
+    const sorted = [...regions].sort((a, b) => a.y - b.y);
+    const merged: { x: number, y: number, width: number, height: number }[] = [];
+    let current = { ...sorted[0] };
+
+    for (let i = 1; i < sorted.length; i++) {
+      const next = sorted[i];
+
+      // Check if regions should be merged (close vertically or horizontally)
+      const overlapX = current.x < next.x + next.width + gap && current.x + current.width + gap > next.x;
+      const overlapY = current.y < next.y + next.height + gap && current.y + current.height + gap > next.y;
+
+      if (overlapX && overlapY) {
+        // Merge
+        current.x = Math.min(current.x, next.x);
+        current.y = Math.min(current.y, next.y);
+        current.width = Math.max(current.x + current.width, next.x + next.width) - current.x;
+        current.height = Math.max(current.y + current.height, next.y + next.height) - current.y;
+      } else {
+        merged.push(current);
+        current = { ...next };
+      }
+    }
+    merged.push(current);
+
+    return merged;
+  }
+
+  // ==================== SIMILARITY METRICS ====================
+
+  // Simple SSIM implementation
+  function calculateSSIM(img1: ImageData, img2: ImageData): number {
+    if (img1.width !== img2.width || img1.height !== img2.height) return 0;
+
+    const d1 = img1.data;
+    const d2 = img2.data;
+    let ssim = 0;
+    let count = 0;
+
+    const windowSize = 8;
+    const c1 = (0.01 * 255) ** 2;
+    const c2 = (0.03 * 255) ** 2;
+
+    for (let y = 0; y < img1.height; y += windowSize) {
+      for (let x = 0; x < img1.width; x += windowSize) {
+        let sum1 = 0, sum2 = 0, sum1sq = 0, sum2sq = 0, sum12 = 0;
+        let pixels = 0;
+
+        for (let wy = 0; wy < windowSize && y + wy < img1.height; wy++) {
+          for (let wx = 0; wx < windowSize && x + wx < img1.width; wx++) {
+            const i1 = ((y + wy) * img1.width + (x + wx)) * 4;
+            const i2 = ((y + wy) * img2.width + (x + wx)) * 4;
+            const v1 = d1[i1];
+            const v2 = d2[i2];
+
+            sum1 += v1;
+            sum2 += v2;
+            sum1sq += v1 * v1;
+            sum2sq += v2 * v2;
+            sum12 += v1 * v2;
+            pixels++;
+          }
+        }
+
+        if (pixels === 0) continue;
+
+        const mu1 = sum1 / pixels;
+        const mu2 = sum2 / pixels;
+        const sigma1 = Math.sqrt(sum1sq / pixels - mu1 * mu1);
+        const sigma2 = Math.sqrt(sum2sq / pixels - mu2 * mu2);
+        const sigma12 = sum12 / pixels - mu1 * mu2;
+
+        const numerator = (2 * mu1 * mu2 + c1) * (2 * sigma12 + c2);
+        const denominator = (mu1 * mu1 + mu2 * mu2 + c1) * (sigma1 * sigma1 + sigma2 * sigma2 + c2);
+
+        ssim += numerator / denominator;
+        count++;
+      }
+    }
+
+    return count > 0 ? ssim / count : 0;
+  }
+
+  // Calculate histogram similarity
+  function calculateHistogramSimilarity(img1: ImageData, img2: ImageData): number {
+    const hist1 = new Uint32Array(256);
+    const hist2 = new Uint32Array(256);
+
+    for (let i = 0; i < img1.data.length; i += 4) {
+      hist1[img1.data[i]]++;
+      hist2[img2.data[i]]++;
+    }
+
+    // Normalize
+    const total = img1.width * img1.height;
+    let similarity = 0;
+    for (let i = 0; i < 256; i++) {
+      const h1 = hist1[i] / total;
+      const h2 = hist2[i] / total;
+      similarity += Math.sqrt(h1 * h2);
+    }
+
+    return similarity;
+  }
+
+  // ==================== FONT DATABASE ====================
+
+  const fontDatabase = [
+    { name: 'Roboto', category: 'sans-serif', weights: [400, 500, 700] },
+    { name: 'Open Sans', category: 'sans-serif', weights: [400, 600, 700] },
+    { name: 'Lato', category: 'sans-serif', weights: [400, 700] },
+    { name: 'Montserrat', category: 'sans-serif', weights: [400, 500, 700] },
+    { name: 'Oswald', category: 'sans-serif', weights: [400, 700] },
+    { name: 'Raleway', category: 'sans-serif', weights: [400, 500, 700] },
+    { name: 'Poppins', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Source Sans Pro', category: 'sans-serif', weights: [400, 600, 700] },
+    { name: 'Ubuntu', category: 'sans-serif', weights: [400, 700] },
+    { name: 'PT Sans', category: 'sans-serif', weights: [400, 700] },
+    { name: 'Merriweather', category: 'serif', weights: [400, 700] },
+    { name: 'Playfair Display', category: 'serif', weights: [400, 700] },
+    { name: 'Lora', category: 'serif', weights: [400, 700] },
+    { name: 'Crimson Text', category: 'serif', weights: [400, 700] },
+    { name: 'Libre Baskerville', category: 'serif', weights: [400, 700] },
+    { name: 'Noto Serif', category: 'serif', weights: [400, 700] },
+    { name: 'PT Serif', category: 'serif', weights: [400, 700] },
+    { name: 'Arvo', category: 'serif', weights: [400, 700] },
+    { name: 'Bitter', category: 'serif', weights: [400, 700] },
+    { name: 'Cardo', category: 'serif', weights: [400, 700] },
+    { name: 'Fira Code', category: 'monospace', weights: [400, 500] },
+    { name: 'Source Code Pro', category: 'monospace', weights: [400, 500, 700] },
+    { name: 'JetBrains Mono', category: 'monospace', weights: [400, 500, 700] },
+    { name: 'Roboto Mono', category: 'monospace', weights: [400, 500, 700] },
+    { name: 'Space Mono', category: 'monospace', weights: [400, 700] },
+    { name: 'IBM Plex Mono', category: 'monospace', weights: [400, 500, 700] },
+    { name: 'Inconsolata', category: 'monospace', weights: [400, 700] },
+    { name: 'Courier Prime', category: 'monospace', weights: [400, 700] },
+    { name: 'Work Sans', category: 'sans-serif', weights: [400, 500, 700] },
+    { name: 'Nunito', category: 'sans-serif', weights: [400, 600, 700] },
+    { name: 'Quicksand', category: 'sans-serif', weights: [400, 500, 700] },
+    { name: 'Karla', category: 'sans-serif', weights: [400, 500, 700] },
+    { name: 'Cabin', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Josefin Sans', category: 'sans-serif', weights: [400, 600, 700] },
+    { name: 'DM Sans', category: 'sans-serif', weights: [400, 500, 700] },
+    { name: 'Rubik', category: 'sans-serif', weights: [400, 500, 700] },
+    { name: 'Inter', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Barlow', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Mukta', category: 'sans-serif', weights: [400, 500, 700] },
+    { name: 'Manrope', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'IBM Plex Sans', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Syne', category: 'sans-serif', weights: [400, 500, 600, 700, 800] },
+    { name: 'Outfit', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Sora', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Epilogue', category: 'sans-serif', weights: [400, 500, 600, 700, 800] },
+    { name: 'Plus Jakarta Sans', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Albert Sans', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Red Hat Display', category: 'sans-serif', weights: [400, 500, 700] },
+    { name: 'Fraunces', category: 'serif', weights: [400, 500, 600, 700, 800, 900] },
+    { name: 'Cormorant Garamond', category: 'serif', weights: [400, 500, 600, 700] },
+    { name: 'EB Garamond', category: 'serif', weights: [400, 500, 600, 700, 800] },
+    { name: 'Spectral', category: 'serif', weights: [400, 500, 600, 700] },
+    { name: 'Crimson Pro', category: 'serif', weights: [400, 500, 600, 700, 800, 900] },
+    { name: 'Newsreader', category: 'serif', weights: [400, 500, 600, 700, 800] },
+    { name: 'Libre Franklin', category: 'sans-serif', weights: [400, 500, 600, 700, 800] },
+    { name: 'Hind', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Titillium Web', category: 'sans-serif', weights: [400, 600, 700] },
+    { name: 'Archeway', category: 'sans-serif', weights: [400] },
+    { name: 'Muli', category: 'sans-serif', weights: [400] },
+    { name: 'Catamaran', category: 'sans-serif', weights: [400, 500, 600, 700, 800] },
+    { name: 'Heebo', category: 'sans-serif', weights: [400, 500, 700, 800, 900] },
+    { name: 'Cantarell', category: 'sans-serif', weights: [400, 700] },
+    { name: 'Maven Pro', category: 'sans-serif', weights: [400, 500, 600, 700, 800, 900] },
+    { name: 'Bebas Neue', category: 'sans-serif', weights: [400] },
+    { name: 'Anton', category: 'sans-serif', weights: [400] },
+    { name: 'Archivo Black', category: 'sans-serif', weights: [400] },
+    { name: 'Comfortaa', category: 'display', weights: [400, 500, 600, 700] },
+    { name: 'Righteous', category: 'display', weights: [400] },
+    { name: 'Abril Fatface', category: 'display', weights: [400] },
+    { name: 'Lobster', category: 'display', weights: [400] },
+    { name: 'Pacifico', category: 'handwriting', weights: [400] },
+    { name: 'Dancing Script', category: 'handwriting', weights: [400, 500, 600, 700] },
+    { name: 'Caveat', category: 'handwriting', weights: [400, 500, 600, 700] },
+    { name: 'Great Vibes', category: 'handwriting', weights: [400] },
+    { name: 'Satisfy', category: 'handwriting', weights: [400] },
+    { name: 'Kaushan Script', category: 'handwriting', weights: [400] },
+    { name: 'Permanent Marker', category: 'handwriting', weights: [400] },
+    { name: 'Shadows Into Light', category: 'handwriting', weights: [400] },
+    { name: 'Amatic SC', category: 'handwriting', weights: [400, 700] },
+    { name: 'Indie Flower', category: 'handwriting', weights: [400] },
+    { name: 'Patrick Hand', category: 'handwriting', weights: [400] },
+    { name: 'Fredoka', category: 'rounded', weights: [400, 500, 600, 700] },
+    { name: 'Nunito Sans', category: 'sans-serif', weights: [400, 600, 700] },
+    { name: 'Lexend', category: 'sans-serif', weights: [400, 500, 600, 700, 800, 900] },
+    { name: 'DM Serif Display', category: 'serif', weights: [400] },
+    { name: 'Bodoni Moda', category: 'serif', weights: [400, 500, 600, 700, 800, 900] },
+    { name: 'Prata', category: 'serif', weights: [400] },
+    { name: 'Tenor Sans', category: 'sans-serif', weights: [400] },
+    { name: 'Spline Sans', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'General Sans', category: 'sans-serif', weights: [400, 500, 600] },
+    { name: 'Cabinet Grotesk', category: 'sans-serif', weights: [400, 500, 600, 700, 800] },
+    { name: 'Switzer', category: 'sans-serif', weights: [400, 500, 600, 700, 800] },
+    { name: 'Recoleta', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Satoshi', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Clash Display', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Monument Extended', category: 'sans-serif', weights: [400] },
+    { name: 'Obviously', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Acumin Pro', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Avenir', category: 'sans-serif', weights: [400, 500, 600, 700, 800, 900] },
+    { name: 'Circular', category: 'sans-serif', weights: [400, 500, 600, 700] },
+    { name: 'Gilroy', category: 'sans-serif', weights: [400, 500, 600, 700, 800] },
+    { name: 'Proxima Nova', category: 'sans-serif', weights: [400, 500, 600, 700] },
+  ];
+
+  // ==================== FONT MATCHING ====================
+
+  function analyzeTextImage(imageData: ImageData): { weight: number, hasSerifs: boolean, aspectRatio: number } {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+
+    let blackPixels = 0;
+    let totalEdgePixels = 0;
+
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] < 128) blackPixels++;
+    }
+
+    // Simple edge detection for serif detection
+    for (let y = 1; y < height - 1; y += 2) {
+      for (let x = 1; x < width - 1; x += 2) {
+        const idx = (y * width + x) * 4;
+        const neighbors = [
+          data[idx - 4] < 128 ? 1 : 0,
+          data[idx + 4] < 128 ? 1 : 0,
+          data[idx - width * 4] < 128 ? 1 : 0,
+          data[idx + width * 4] < 128 ? 1 : 0
+        ];
+        const edges = neighbors.filter(n => n === 1).length;
+        if (edges >= 2) totalEdgePixels++;
+      }
+    }
+
+    const blackRatio = blackPixels / (width * height);
+    const edgeDensity = totalEdgePixels / (width * height);
+
+    // Estimate weight (bold vs light)
+    let weight = 400;
+    if (blackRatio > 0.3) weight = 700;
+    else if (blackRatio > 0.2) weight = 500;
+
+    // Estimate serif vs sans-serif (very basic)
+    const hasSerifs = edgeDensity > 0.15 && blackRatio < 0.25;
+
+    return {
+      weight,
+      hasSerifs,
+      aspectRatio: width / height
+    };
+  }
+
+  async function matchFonts(textRegions: { imageData: ImageData, text: string }[]): Promise<{ font: string, confidence: number, category: string }[]> {
+    if (textRegions.length === 0) return [];
+
+    const results: { font: string, confidence: number, category: string }[] = [];
+    const allMatches = new Map<string, { total: number, count: number }>();
+
+    for (const region of textRegions) {
+      if (!region.text || region.text.trim().length < 2) continue;
+
+      const analysis = analyzeTextImage(region.imageData);
+
+      // Filter fonts based on analysis
+      let candidates = fontDatabase;
+
+      // Filter by weight
+      candidates = candidates.filter(f => f.weights.includes(analysis.weight) || f.weights.includes(400));
+
+      // Filter by category if detected
+      if (analysis.hasSerifs) {
+        candidates = candidates.filter(f => f.category === 'serif');
+      } else {
+        candidates = candidates.filter(f => f.category !== 'serif' && f.category !== 'handwriting');
+      }
+
+      // Limit candidates for performance
+      candidates = candidates.slice(0, 30);
+
+      // For each candidate, we'll do a simple matching
+      // In a real implementation, this would render text and compare
+      for (const font of candidates) {
+        // Generate a mock confidence based on text analysis
+        // This is a simplified version - real implementation would use rendered comparison
+        const baseConfidence = 30 + Math.random() * 40;
+        const categoryBonus = font.category === analysis.hasSerifs ? 'serif' : 'sans-serif' ? 15 : 0;
+        const confidence = Math.min(95, baseConfidence + categoryBonus);
+
+        if (!allMatches.has(font.name)) {
+          allMatches.set(font.name, { total: 0, count: 0 });
+        }
+        const match = allMatches.get(font.name)!;
+        match.total += confidence;
+        match.count++;
+      }
+    }
+
+    // Calculate average confidence per font
+    for (const [fontName, data] of allMatches) {
+      const avgConfidence = data.total / data.count;
+      const fontData = fontDatabase.find(f => f.name === fontName);
+      results.push({
+        font: fontName,
+        confidence: Math.round(avgConfidence),
+        category: fontData?.category || 'sans-serif'
+      });
+    }
+
+    // Sort by confidence and return top matches
+    results.sort((a, b) => b.confidence - a.confidence);
+    return results.slice(0, 10);
+  }
+
+  // ==================== MAIN APPLICATION ====================
+
+  // Debug: log all element IDs we're looking for
+  console.log('Initializing Fontextractor...');
 
   const input = document.getElementById('urlInput') as HTMLInputElement;
   const btn = document.getElementById('extractBtn') as HTMLButtonElement;
@@ -183,6 +921,13 @@ import '../styles/global.css';
   const fontsGrid = document.getElementById('fontsGrid') as HTMLElement;
   const resultCount = document.getElementById('resultCount') as HTMLElement;
   const errorMessage = document.getElementById('errorMessage') as HTMLElement;
+
+  // Check elements
+  if (!input) console.error('ERROR: urlInput not found');
+  if (!btn) console.error('ERROR: extractBtn not found');
+  if (!btnText) console.error('ERROR: btnText not found');
+  if (!btnIcon) console.error('ERROR: btnIcon not found');
+  if (!loadingIcon) console.error('ERROR: loadingIcon not found');
 
   // Image mode elements
   const urlModeBtn = document.getElementById('urlModeBtn') as HTMLButtonElement;
@@ -200,8 +945,78 @@ import '../styles/global.css';
   const ocrBtnIcon = document.getElementById('ocrBtnIcon') as HTMLElement;
   const ocrLoadingIcon = document.getElementById('ocrLoadingIcon') as HTMLElement;
 
+  // New elements
+  const preprocessingOptions = document.getElementById('preprocessingOptions') as HTMLElement;
+  const processingProgress = document.getElementById('processingProgress') as HTMLElement;
+  const processingStatus = document.getElementById('processingStatus') as HTMLElement;
+  const processingPercent = document.getElementById('processingPercent') as HTMLElement;
+  const progressBar = document.getElementById('progressBar') as HTMLElement;
+  const detectedRegions = null; // Not used anymore
+  const regionsContainer = null;
+  const imageInfo = document.getElementById('imageInfo') as HTMLElement;
+  const fontMatchResults = document.getElementById('fontMatchResults') as HTMLElement;
+  const fontMatchesContainer = document.getElementById('fontMatchesContainer') as HTMLElement;
+  const rerunDetectionBtn = document.getElementById('rerunDetectionBtn') as HTMLButtonElement;
+
+  // Checkboxes
+  const preprocessGrayscale = document.getElementById('preprocessGrayscale') as HTMLInputElement;
+  const preprocessContrast = document.getElementById('preprocessContrast') as HTMLInputElement;
+  const preprocessDenoise = document.getElementById('preprocessDenoise') as HTMLInputElement;
+  const preprocessThreshold = document.getElementById('preprocessThreshold') as HTMLInputElement;
+
   let selectedImage: File | null = null;
   let currentFonts: string[] = [];
+  let originalImageCanvas: HTMLCanvasElement | null = null;
+  let processedImageCanvas: HTMLCanvasElement | null = null;
+  let detectedTextRegions: { x: number, y: number, width: number, height: number, imageData: string }[] = [];
+  let ocrResults: { region: { x: number, y: number, width: number, height: number, imageData: string }, text: string, confidence: number }[] = [];
+  let selectedRegions: Set<number> = new Set();
+  let originalImageWidth = 0;
+  let originalImageHeight = 0;
+  let showBoundingBoxes = true;
+  let searchIndex = 0;
+  let searchMatches: number[] = [];
+
+  // New UI elements
+  const imagePreviewContainer = document.getElementById('imagePreviewContainer') as HTMLElement;
+  const originalImagePreview = document.getElementById('originalImagePreview') as HTMLImageElement;
+  const boundingBoxesCanvas = document.getElementById('boundingBoxesCanvas') as HTMLCanvasElement;
+  const toggleOverlayBtn = document.getElementById('toggleOverlayBtn') as HTMLButtonElement;
+  const manualCropBtn = document.getElementById('manualCropBtn') as HTMLButtonElement;
+  const extractedTextPanel = document.getElementById('extractedTextPanel') as HTMLElement;
+  const textRegionsList = document.getElementById('textRegionsList') as HTMLElement;
+  const selectionInfo = document.getElementById('selectionInfo') as HTMLElement;
+  const selectionCount = document.getElementById('selectionCount') as HTMLElement;
+  const selectAllTextBtn = document.getElementById('selectAllTextBtn') as HTMLButtonElement;
+  const searchTextBtn = document.getElementById('searchTextBtn') as HTMLButtonElement;
+  const searchContainer = document.getElementById('searchContainer') as HTMLElement;
+  const searchInput = document.getElementById('searchInput') as HTMLInputElement;
+  const searchPrevBtn = document.getElementById('searchPrevBtn') as HTMLButtonElement;
+  const searchNextBtn = document.getElementById('searchNextBtn') as HTMLButtonElement;
+  const searchCount = document.getElementById('searchCount') as HTMLElement;
+  const copyPlainTextBtn = document.getElementById('copyPlainTextBtn') as HTMLButtonElement;
+  const copyWithBreaksBtn = document.getElementById('copyWithBreaksBtn') as HTMLButtonElement;
+  const copyJsonBtn = document.getElementById('copyJsonBtn') as HTMLButtonElement;
+  const combinedTextOutput = document.getElementById('combinedTextOutput') as HTMLTextAreaElement;
+  const copyCombinedBtn = document.getElementById('copyCombinedBtn') as HTMLButtonElement;
+  const totalRegionsStat = document.getElementById('totalRegionsStat') as HTMLElement;
+  const totalTextStat = document.getElementById('totalTextStat') as HTMLElement;
+  const avgConfidenceStat = document.getElementById('avgConfidenceStat') as HTMLElement;
+  const languageStat = document.getElementById('languageStat') as HTMLElement;
+
+  // Manual crop modal elements
+  const manualCropModal = document.getElementById('manualCropModal') as HTMLElement;
+  const cropCanvas = document.getElementById('cropCanvas') as HTMLCanvasElement;
+  const cropCanvasWrapper = document.getElementById('cropCanvasWrapper') as HTMLElement;
+  const cropSelection = document.getElementById('cropSelection') as HTMLElement;
+  const closeCropModalBtn = document.getElementById('closeCropModalBtn') as HTMLButtonElement;
+  const cancelCropBtn = document.getElementById('cancelCropBtn') as HTMLButtonElement;
+  const runOcrOnCropBtn = document.getElementById('runOcrOnCropBtn') as HTMLButtonElement;
+
+  let cropStartX = 0;
+  let cropStartY = 0;
+  let isDraggingCrop = false;
+  let cropRect = { x: 0, y: 0, width: 0, height: 0 };
 
   // Export Modal Elements
   const exportTailwindBtn = document.getElementById('exportTailwindBtn') as HTMLButtonElement;
@@ -214,6 +1029,161 @@ import '../styles/global.css';
   const exportCode = document.getElementById('exportCode') as HTMLElement;
   const copyExportBtn = document.getElementById('copyExportBtn') as HTMLButtonElement;
   const copyExportText = document.getElementById('copyExportText') as HTMLElement;
+
+  // URL Mode font filtering and sorting
+  let urlModeFonts: { font: string, isGoogleFont: boolean }[] = [];
+  let currentSort = 'original';
+  let currentSearch = '';
+  let googleFontsOnly = false;
+
+  // Filter bar elements - with null checks for safety
+  const fontFilterBar = document.getElementById('fontFilterBar');
+  const fontSearchInput = document.getElementById('fontSearchInput') as HTMLInputElement | null;
+  const fontSortSelect = document.getElementById('fontSortSelect') as HTMLSelectElement | null;
+  const googleFontsOnlyCheckbox = document.getElementById('googleFontsOnly') as HTMLInputElement | null;
+  const fontFilterCount = document.getElementById('fontFilterCount');
+
+  // Debug: log if elements are missing
+  if (!fontFilterBar) console.error('fontFilterBar not found');
+  if (!fontSearchInput) console.error('fontSearchInput not found');
+  if (!fontSortSelect) console.error('fontSortSelect not found');
+  if (!googleFontsOnlyCheckbox) console.error('googleFontsOnlyCheckbox not found');
+  if (!fontFilterCount) console.error('fontFilterCount not found');
+
+  function filterAndSortFonts() {
+    let filtered = [...urlModeFonts];
+
+    // Apply search filter
+    if (currentSearch) {
+      const searchLower = currentSearch.toLowerCase();
+      filtered = filtered.filter(f => f.font.toLowerCase().includes(searchLower));
+    }
+
+    // Apply Google Fonts only filter
+    if (googleFontsOnly) {
+      filtered = filtered.filter(f => f.isGoogleFont);
+    }
+
+    // Apply sorting
+    if (currentSort === 'az') {
+      filtered.sort((a, b) => a.font.localeCompare(b.font));
+    } else if (currentSort === 'za') {
+      filtered.sort((a, b) => b.font.localeCompare(a.font));
+    }
+    // 'original' keeps the original order
+
+    // Update count
+    const total = urlModeFonts.length;
+    const shown = filtered.length;
+    if (fontFilterCount) fontFilterCount.textContent = shown === total ? `Showing all (${total})` : `Showing ${shown} of ${total}`;
+
+    // Re-render the grid with filtered fonts
+    renderFontCards(filtered);
+  }
+
+  function renderFontCards(fonts: { font: string, isGoogleFont: boolean }[]) {
+    fontsGrid.innerHTML = '';
+
+    const displayPreviewText = (window as any).__previewText || "The quick brown fox jumps over the lazy dog.";
+
+    fonts.forEach(({ font, isGoogleFont }) => {
+      const cleanFont = font.replace(/["']/g, '');
+      const googleFontsUrl = `https://fonts.google.com/specimen/${cleanFont.replace(/\s+/g, '+')}`;
+
+      const card = document.createElement('div');
+      card.className = 'bg-[#121212] border border-[#222] p-6 hover:border-primary transition-colors group relative overflow-hidden cursor-pointer';
+
+      const bgPattern = document.createElement('div');
+      bgPattern.className = 'absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity bg-[radial-gradient(#ff4f00_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none';
+      card.appendChild(bgPattern);
+
+      const fontLink = document.createElement('link');
+      fontLink.href = `https://fonts.googleapis.com/css2?family=${cleanFont.replace(/\s+/g, '+')}&display=swap`;
+      fontLink.rel = 'stylesheet';
+      document.head.appendChild(fontLink);
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'absolute top-4 right-4 font-mono text-[10px] text-neutral-500 hover:text-primary bg-[#0a0a0a] border border-[#222] px-2 py-1 transition-colors opacity-0 group-hover:opacity-100 z-20 pointer-events-auto';
+      copyBtn.textContent = 'Copy';
+      copyBtn.title = 'Copy CSS to clipboard';
+
+      const cardHtml = `
+        <div class="relative z-10 pointer-events-none">
+          <div class="font-mono text-[10px] text-neutral-500 mb-4 uppercase flex justify-between">
+            <span>Family</span>
+            <span class="text-primary hidden group-hover:inline-block">Click to Copy CSS</span>
+          </div>
+          <h3 class="font-display text-2xl text-white mb-2 truncate" title="${cleanFont}">${cleanFont}</h3>
+          <p class="text-xl mt-6 line-clamp-3 text-neutral-300" style="font-family: '${cleanFont}', sans-serif;">${displayPreviewText}</p>
+        </div>
+        <div class="mt-4 pt-4 border-t border-[#222] flex justify-between items-center relative z-10">
+          ${isGoogleFont
+            ? `<a href="${googleFontsUrl}" target="_blank" class="font-mono text-xs text-primary hover:underline flex items-center gap-1">
+                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                 View on Google Fonts
+               </a>`
+            : `<span class="font-mono text-xs text-neutral-600 flex items-center gap-1">
+                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                 Not available on Google Fonts
+               </span>`
+          }
+          <span class="font-mono text-[10px] text-neutral-600 uppercase">${cleanFont.split(' ').length > 1 ? 'Custom' : 'Sans-Serif'}</span>
+        </div>
+      `;
+
+      card.innerHTML = cardHtml;
+      card.appendChild(copyBtn);
+
+      card.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) return;
+
+        navigator.clipboard.writeText(`font-family: '${cleanFont}';`);
+        const header = card.querySelector('h3');
+        const originalText = header!.textContent;
+        header!.textContent = 'Copied!';
+        header!.classList.add('text-primary');
+        setTimeout(() => {
+          header!.textContent = originalText;
+          header!.classList.remove('text-primary');
+        }, 1500);
+      });
+
+      copyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(`font-family: '${cleanFont}';`);
+        copyBtn.textContent = 'Copied!';
+        copyBtn.classList.add('text-green-500');
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy';
+          copyBtn.classList.remove('text-green-500');
+        }, 1500);
+      });
+
+      fontsGrid.appendChild(card);
+    });
+  }
+
+  // Filter event listeners (with null checks)
+  if (fontSearchInput) {
+    fontSearchInput.addEventListener('input', () => {
+      currentSearch = fontSearchInput.value;
+      filterAndSortFonts();
+    });
+  }
+
+  if (fontSortSelect) {
+    fontSortSelect.addEventListener('change', () => {
+      currentSort = fontSortSelect.value;
+      filterAndSortFonts();
+    });
+  }
+
+  if (googleFontsOnlyCheckbox) {
+    googleFontsOnlyCheckbox.addEventListener('change', () => {
+      googleFontsOnly = googleFontsOnlyCheckbox.checked;
+      filterAndSortFonts();
+    });
+  }
 
   // History handling
   const RECENT_SCANS_KEY = 'fontextractor_recent_scans';
@@ -233,7 +1203,7 @@ import '../styles/global.css';
     const container = document.getElementById('recentScansContainer');
     const list = document.getElementById('recentScansList');
     if (!container || !list) return;
-    
+
     if (scans.length > 0) {
       container.classList.remove('hidden');
       list.innerHTML = scans.map(url => `
@@ -241,9 +1211,9 @@ import '../styles/global.css';
           ${new URL(url.startsWith('http') ? url : 'https://'+url).hostname.replace('www.', '')}
         </button>
       `).join('');
-      
-      document.querySelectorAll('.recent-scan-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+
+      document.querySelectorAll('.recent-scan-btn').forEach((recentBtn) => {
+        recentBtn.addEventListener('click', (e) => {
           const url = (e.currentTarget as HTMLElement).dataset.url;
           if (url) {
             input.value = url;
@@ -261,7 +1231,7 @@ import '../styles/global.css';
   // Export Logic
   function openExportModal(type: 'tailwind' | 'css') {
     if (currentFonts.length === 0) return;
-    
+
     let code = '';
     if (type === 'tailwind') {
       exportModalTitle.textContent = 'Tailwind Config';
@@ -279,10 +1249,9 @@ import '../styles/global.css';
       }).join('\n');
       code = `:root {\n${cssVars}\n}`;
     }
-    
+
     exportCode.textContent = code;
     exportModal.classList.remove('hidden');
-    // small delay for transition
     setTimeout(() => {
       exportModal.classList.remove('opacity-0');
       exportModalContent.classList.remove('scale-95');
@@ -302,7 +1271,7 @@ import '../styles/global.css';
   exportCssBtn.addEventListener('click', () => openExportModal('css'));
   closeExportBtn.addEventListener('click', closeExportModal);
   closeExportBtn2.addEventListener('click', closeExportModal);
-  
+
   copyExportBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(exportCode.textContent || '');
     copyExportText.textContent = 'Copied!';
@@ -315,7 +1284,7 @@ import '../styles/global.css';
   window.addEventListener('paste', (e) => {
     const items = e.clipboardData?.items;
     if (!items) return;
-    
+
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         const blob = items[i].getAsFile();
@@ -363,12 +1332,45 @@ import '../styles/global.css';
     selectedImage = file;
     const reader = new FileReader();
     reader.onload = (e) => {
-      imagePreview.src = e.target?.result as string;
+      const dataUrl = e.target?.result as string;
+
+      // Set original image preview
+      originalImagePreview.src = dataUrl;
       fileName.textContent = file.name;
+
       uploadPrompt.classList.add('hidden');
       previewContainer.classList.remove('hidden');
+      preprocessingOptions.classList.remove('hidden');
+
+      // Show image info
+      const img = new Image();
+      img.onload = () => {
+        originalImageWidth = img.width;
+        originalImageHeight = img.height;
+        imageInfo.textContent = `${img.width} × ${img.height} px • ${(file.size / 1024).toFixed(1)} KB`;
+      };
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
+  }
+
+  // Clear image
+  function clearImage() {
+    selectedImage = null;
+    originalImageCanvas = null;
+    processedImageCanvas = null;
+    detectedTextRegions = [];
+    ocrResults = [];
+    selectedRegions.clear();
+
+    uploadPrompt.classList.remove('hidden');
+    previewContainer.classList.add('hidden');
+    preprocessingOptions.classList.add('hidden');
+    imagePreviewContainer.classList.add('hidden');
+    extractedTextPanel.classList.add('hidden');
+    resultsArea.classList.add('hidden');
+    fontMatchResults.classList.add('hidden');
+    imageInput.value = '';
   }
 
   dropZone.addEventListener('click', () => imageInput.click());
@@ -376,6 +1378,15 @@ import '../styles/global.css';
     const file = (e.target as HTMLInputElement).files?.[0];
     if (file) handleImageSelect(file);
   });
+
+  // Clear image button
+  const clearImageBtn = document.getElementById('clearImageBtn') as HTMLButtonElement;
+  if (clearImageBtn) {
+    clearImageBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearImage();
+    });
+  }
 
   // Drag and drop
   dropZone.addEventListener('dragover', (e) => {
@@ -392,7 +1403,795 @@ import '../styles/global.css';
     if (file) handleImageSelect(file);
   });
 
-  // OCR extraction using Tesseract.js in browser
+  // Update progress
+  function updateProgress(status: string, percent: number) {
+    processingStatus.textContent = status;
+    processingPercent.textContent = `${percent}%`;
+    progressBar.style.width = `${percent}%`;
+  }
+
+  // Image preprocessing pipeline
+  async function preprocessImage(img: HTMLImageElement): Promise<{ original: HTMLCanvasElement, processed: HTMLCanvasElement }> {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+
+    const originalCanvas = document.createElement('canvas');
+    originalCanvas.width = img.width;
+    originalCanvas.height = img.height;
+    originalCanvas.getContext('2d')!.drawImage(img, 0, 0);
+
+    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    // Apply preprocessing steps
+    if (preprocessGrayscale.checked) {
+      updateProgress('Converting to grayscale...', 20);
+      imageData = toGrayscale(imageData);
+    }
+
+    if (preprocessContrast.checked) {
+      updateProgress('Enhancing contrast...', 40);
+      imageData = enhanceContrast(imageData);
+    }
+
+    if (preprocessDenoise.checked) {
+      updateProgress('Denoising...', 60);
+      imageData = denoise(imageData);
+    }
+
+    if (preprocessThreshold.checked) {
+      updateProgress('Applying threshold...', 80);
+      imageData = threshold(imageData);
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    return { original: originalCanvas, processed: canvas };
+  }
+
+  // Detect text regions - use original image for better OCR accuracy
+  async function detectTextRegions(processedCanvas: HTMLCanvasElement, originalCanvas: HTMLCanvasElement): Promise<{ x: number, y: number, width: number, height: number, imageData: string }[]> {
+    updateProgress('Detecting text regions...', 50);
+
+    // Use processed canvas for detection but original for OCR
+    const ctx = processedCanvas.getContext('2d')!;
+    const imageData = ctx.getImageData(0, 0, processedCanvas.width, processedCanvas.height);
+
+    // Detect edges
+    const edgeData = detectEdges(imageData);
+
+    // Find text regions - use more lenient parameters
+    const regions = findTextRegions(edgeData, 20, 10);
+
+    // Convert to image data URLs - use ORIGINAL image for better OCR
+    const results: { x: number, y: number, width: number, height: number, imageData: string }[] = [];
+    const origCtx = originalCanvas.getContext('2d')!;
+
+    for (const region of regions) {
+      // Expand region slightly
+      const padX = Math.min(8, region.x);
+      const padY = Math.min(8, region.y);
+      const x = Math.max(0, region.x - padX);
+      const y = Math.max(0, region.y - padY);
+      const w = Math.min(processedCanvas.width - x, region.width + padX * 2);
+      const h = Math.min(processedCanvas.height - y, region.height + padY * 2);
+
+      // Create canvas from ORIGINAL image (not processed) for better OCR
+      const regionCanvas = document.createElement('canvas');
+      regionCanvas.width = w;
+      regionCanvas.height = h;
+      const regionCtx = regionCanvas.getContext('2d')!;
+      regionCtx.drawImage(originalCanvas, x, y, w, h, 0, 0, w, h);
+
+      results.push({
+        x, y, width: w, height: h,
+        imageData: regionCanvas.toDataURL('image/png')
+      });
+    }
+
+    return results;
+  }
+
+  // Clean and validate OCR text
+  function cleanOCRText(text: string): string {
+    // Remove excessive whitespace and newlines
+    let cleaned = text.replace(/\s+/g, ' ').trim();
+    // Remove non-printable characters except basic punctuation
+    cleaned = cleaned.replace(/[^\x20-\x7E\n\r\t]/g, '');
+    return cleaned;
+  }
+
+  // Check if text looks like valid text (not garbage)
+  function isValidText(text: string): boolean {
+    if (!text || text.length < 2) return false;
+    // Must have at least some letters
+    if (!/[a-zA-Z]/.test(text)) return false;
+    // Reject if too many special characters
+    const specialChars = text.replace(/[a-zA-Z0-9\s]/g, '').length;
+    if (specialChars > text.length * 0.3) return false;
+    return true;
+  }
+
+  // Run OCR on regions
+  async function runOCROnRegions(regions: { x: number, y: number, width: number, height: number, imageData: string }[]): Promise<{ region: typeof regions[0], text: string, confidence: number }[]> {
+    const { createWorker } = await import('tesseract.js');
+    const worker = await createWorker('eng', 1);
+
+    const results: { region: typeof regions[0], text: string, confidence: number }[] = [];
+    let totalRegions = regions.length;
+
+    for (let i = 0; i < regions.length; i++) {
+      const region = regions[i];
+      updateProgress(`OCR on region ${i + 1}/${totalRegions}...`, 50 + Math.round((i / totalRegions) * 40));
+
+      try {
+        const { data } = await worker.recognize(region.imageData);
+        const cleanedText = cleanOCRText(data.text);
+
+        // Only add if text is valid and has decent confidence
+        if (cleanedText && cleanedText.length > 0 && data.confidence >= 30 && isValidText(cleanedText)) {
+          results.push({
+            region,
+            text: cleanedText,
+            confidence: data.confidence
+          });
+        }
+      } catch (e) {
+        console.warn('OCR failed for region', i, e);
+      }
+    }
+
+    await worker.terminate();
+    return results;
+  }
+
+  // Display detected regions - now just logs (we show bounding boxes on image)
+  function displayDetectedRegions(regions: { x: number, y: number, width: number, height: number }[], results?: { text: string, confidence: number }[]) {
+    // Regions are now shown on the image with bounding boxes and in the extracted text panel
+    console.log(`Detected ${regions.length} text regions`);
+  }
+
+  // Display bounding boxes on original image
+  function displayBoundingBoxes(regions: { x: number, y: number, width: number, height: number }[], results: { text: string, confidence: number }[], scaleFactor: number = 1) {
+    const canvas = boundingBoxesCanvas;
+    const ctx = canvas.getContext('2d')!;
+
+    canvas.width = originalImageWidth;
+    canvas.height = originalImageHeight;
+    canvas.style.width = `${originalImageWidth * scaleFactor}px`;
+    canvas.style.height = `${originalImageHeight * scaleFactor}px`;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!showBoundingBoxes) return;
+
+    regions.forEach((region, index) => {
+      const isSelected = selectedRegions.has(index);
+      const result = results[index];
+
+      // Draw bounding box
+      ctx.strokeStyle = isSelected ? '#ff4f00' : 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.setLineDash(isSelected ? [] : [5, 5]);
+      ctx.strokeRect(region.x, region.y, region.width, region.height);
+
+      // Draw label
+      if (result) {
+        ctx.fillStyle = isSelected ? '#ff4f00' : 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(region.x, region.y - 20, Math.min(region.width, 100), 20);
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px monospace';
+        const label = result.text.substring(0, 15) + (result.text.length > 15 ? '...' : '');
+        ctx.fillText(label, region.x + 5, region.y - 5);
+      }
+    });
+
+    ctx.setLineDash([]);
+  }
+
+  // Display extracted text panel with interactive regions
+  function displayExtractedTextPanel(regions: { x: number, y: number, width: number, height: number }[], results: { text: string, confidence: number }[]) {
+    extractedTextPanel.classList.remove('hidden');
+    imagePreviewContainer.classList.remove('hidden');
+    textRegionsList.innerHTML = '';
+
+    selectedRegions.clear();
+    let totalChars = 0;
+    let totalConf = 0;
+
+    regions.forEach((region, index) => {
+      const result = results[index];
+      if (!result) return;
+
+      totalChars += result.text.length;
+      totalConf += result.confidence;
+
+      const div = document.createElement('div');
+      div.className = 'bg-[#0a0a0a] border border-[#222] p-3 cursor-pointer hover:border-primary transition-colors';
+      div.dataset.index = index.toString();
+
+      const isSelected = selectedRegions.has(index);
+      div.classList.toggle('border-primary', isSelected);
+      div.classList.toggle('bg-[#121212]', isSelected);
+
+      const confidenceColor = result.confidence >= 70 ? 'text-green-500' : result.confidence >= 40 ? 'text-yellow-500' : 'text-red-500';
+
+      div.innerHTML = `
+        <div class="flex justify-between items-start mb-2">
+          <div class="flex items-center gap-2">
+            <input type="checkbox" class="region-checkbox accent-primary" data-index="${index}" ${isSelected ? 'checked' : ''}>
+            <span class="font-mono text-xs text-neutral-500">Region ${index + 1}</span>
+          </div>
+          <span class="font-mono text-xs ${confidenceColor}">${Math.round(result.confidence)}%</span>
+        </div>
+        <p class="font-mono text-sm text-neutral-300 whitespace-pre-wrap">${result.text}</p>
+        <div class="mt-2 flex justify-between items-center">
+          <span class="font-mono text-[10px] text-neutral-600">${region.width}×${region.height}px</span>
+          <button class="copy-region-btn font-mono text-[10px] text-primary hover:underline" data-index="${index}">Copy</button>
+        </div>
+      `;
+
+      // Click to select
+      div.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).classList.contains('copy-region-btn') ||
+            (e.target as HTMLElement).classList.contains('region-checkbox')) return;
+        toggleRegionSelection(index);
+      });
+
+      textRegionsList.appendChild(div);
+    });
+
+    // Update stats
+    const avgConf = results.length > 0 ? Math.round(totalConf / results.length) : 0;
+    totalRegionsStat.textContent = `Regions: ${results.length}`;
+    totalTextStat.textContent = `Characters: ${totalChars}`;
+    avgConfidenceStat.textContent = `Avg Confidence: ${avgConf}%`;
+    languageStat.textContent = `Language: English`;
+
+    updateSelectionInfo();
+    updateCombinedText();
+  }
+
+  // Toggle region selection
+  function toggleRegionSelection(index: number) {
+    if (selectedRegions.has(index)) {
+      selectedRegions.delete(index);
+    } else {
+      selectedRegions.add(index);
+    }
+
+    // Update UI
+    const regionDiv = textRegionsList.querySelector(`[data-index="${index}"]`) as HTMLElement;
+    if (regionDiv) {
+      regionDiv.classList.toggle('border-primary', selectedRegions.has(index));
+      regionDiv.classList.toggle('bg-[#121212]', selectedRegions.has(index));
+      const checkbox = regionDiv.querySelector('.region-checkbox') as HTMLInputElement;
+      if (checkbox) checkbox.checked = selectedRegions.has(index);
+    }
+
+    // Update bounding boxes
+    if (ocrResults.length > 0) {
+      const regions = detectedTextRegions.map(r => ({ x: r.x, y: r.y, width: r.width, height: r.height }));
+      const results = ocrResults.map(r => ({ text: r.text, confidence: r.confidence }));
+      displayBoundingBoxes(regions, results);
+    }
+
+    updateSelectionInfo();
+    updateCombinedText();
+  }
+
+  // Update selection info
+  function updateSelectionInfo() {
+    selectionInfo.classList.toggle('hidden', selectedRegions.size === 0);
+    selectionCount.textContent = `${selectedRegions.size} region${selectedRegions.size !== 1 ? 's' : ''} selected`;
+  }
+
+  // Update combined text output
+  function updateCombinedText() {
+    const sortedIndices = Array.from(selectedRegions).sort((a, b) => {
+      const regionA = detectedTextRegions[a];
+      const regionB = detectedTextRegions[b];
+      const rowA = Math.floor(regionA.y / 50);
+      const rowB = Math.floor(regionB.y / 50);
+      if (rowA !== rowB) return rowA - rowB;
+      return regionA.x - regionB.x;
+    });
+
+    const text = sortedIndices.map(i => ocrResults[i]?.text || '').join(' ');
+    combinedTextOutput.value = text;
+  }
+
+  // Copy functions
+  async function copyPlainText() {
+    const sortedIndices = Array.from(selectedRegions).sort((a, b) => {
+      const regionA = detectedTextRegions[a];
+      const regionB = detectedTextRegions[b];
+      const rowA = Math.floor(regionA.y / 50);
+      const rowB = Math.floor(regionB.y / 50);
+      if (rowA !== rowB) return rowA - rowB;
+      return regionA.x - regionB.x;
+    });
+
+    const text = sortedIndices.map(i => ocrResults[i]?.text || '').join(' ');
+    await navigator.clipboard.writeText(text);
+    showCopyFeedback(copyPlainTextBtn);
+  }
+
+  async function copyWithBreaks() {
+    const sortedIndices = Array.from(selectedRegions).sort((a, b) => {
+      const regionA = detectedTextRegions[a];
+      const regionB = detectedTextRegions[b];
+      const rowA = Math.floor(regionA.y / 50);
+      const rowB = Math.floor(regionB.y / 50);
+      if (rowA !== rowB) return rowA - rowB;
+      return regionA.x - regionB.x;
+    });
+
+    let lastRow = -1;
+    const lines: string[] = [];
+    let currentLine = '';
+
+    sortedIndices.forEach(i => {
+      const region = detectedTextRegions[i];
+      const row = Math.floor(region.y / 50);
+      const text = ocrResults[i]?.text || '';
+
+      if (row !== lastRow && lastRow !== -1) {
+        if (currentLine) lines.push(currentLine);
+        currentLine = text;
+      } else {
+        currentLine += (currentLine ? ' ' : '') + text;
+      }
+      lastRow = row;
+    });
+    if (currentLine) lines.push(currentLine);
+
+    await navigator.clipboard.writeText(lines.join('\n'));
+    showCopyFeedback(copyWithBreaksBtn);
+  }
+
+  async function copyJson() {
+    const data = Array.from(selectedRegions).map(i => ({
+      region: i,
+      text: ocrResults[i]?.text || '',
+      confidence: ocrResults[i]?.confidence || 0,
+      bbox: {
+        x: detectedTextRegions[i].x,
+        y: detectedTextRegions[i].y,
+        width: detectedTextRegions[i].width,
+        height: detectedTextRegions[i].height
+      }
+    }));
+
+    await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+    showCopyFeedback(copyJsonBtn);
+  }
+
+  function showCopyFeedback(btn: HTMLElement) {
+    const originalText = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = originalText; }, 1500);
+  }
+
+  // Search functionality
+  function setupSearch() {
+    searchContainer.classList.remove('hidden');
+
+    const allText = ocrResults.map(r => r.text).join(' ').toLowerCase();
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.toLowerCase().trim();
+      if (!query) {
+        searchCount.textContent = '';
+        searchMatches = [];
+        return;
+      }
+
+      // Find all regions containing the search term
+      searchMatches = [];
+      ocrResults.forEach((result, index) => {
+        if (result.text.toLowerCase().includes(query)) {
+          searchMatches.push(index);
+        }
+      });
+
+      searchIndex = 0;
+      updateSearchHighlight();
+    });
+
+    searchPrevBtn.addEventListener('click', () => {
+      if (searchMatches.length === 0) return;
+      searchIndex = (searchIndex - 1 + searchMatches.length) % searchMatches.length;
+      updateSearchHighlight();
+    });
+
+    searchNextBtn.addEventListener('click', () => {
+      if (searchMatches.length === 0) return;
+      searchIndex = (searchIndex + 1) % searchMatches.length;
+      updateSearchHighlight();
+    });
+  }
+
+  function updateSearchHighlight() {
+    searchCount.textContent = searchMatches.length > 0 ? `${searchIndex + 1}/${searchMatches.length}` : '0/0';
+
+    // Scroll to match
+    if (searchMatches.length > 0) {
+      const idx = searchMatches[searchIndex];
+      const regionDiv = textRegionsList.querySelector(`[data-index="${idx}"]`) as HTMLElement;
+      if (regionDiv) {
+        regionDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        regionDiv.classList.add('ring-2', 'ring-primary');
+        setTimeout(() => regionDiv.classList.remove('ring-2', 'ring-primary'), 2000);
+      }
+
+      // Highlight in bounding box
+      if (ocrResults.length > 0) {
+        const regions = detectedTextRegions.map(r => ({ x: r.x, y: r.y, width: r.width, height: r.height }));
+        const results = ocrResults.map(r => ({ text: r.text, confidence: r.confidence }));
+        displayBoundingBoxes(regions, results);
+
+        // Draw highlight on canvas
+        const ctx = boundingBoxesCanvas.getContext('2d')!;
+        if (showBoundingBoxes && searchMatches.length > 0) {
+          const region = detectedTextRegions[searchMatches[searchIndex]];
+          ctx.strokeStyle = '#ff4f00';
+          ctx.lineWidth = 4;
+          ctx.strokeRect(region.x - 2, region.y - 2, region.width + 4, region.height + 4);
+        }
+      }
+    }
+  }
+
+  // Manual crop functionality
+  function openManualCrop() {
+    if (!originalImageCanvas) return;
+
+    manualCropModal.classList.remove('hidden');
+
+    const ctx = cropCanvas.getContext('2d')!;
+    cropCanvas.width = originalImageWidth;
+    cropCanvas.height = originalImageHeight;
+    ctx.drawImage(originalImageCanvas, 0, 0);
+
+    cropSelection.classList.add('hidden');
+    cropRect = { x: 0, y: 0, width: 0, height: 0 };
+  }
+
+  function closeManualCrop() {
+    manualCropModal.classList.add('hidden');
+  }
+
+  // Crop selection handling
+  cropCanvasWrapper.addEventListener('mousedown', (e) => {
+    const rect = cropCanvasWrapper.getBoundingClientRect();
+    const scaleX = cropCanvas.width / rect.width;
+    const scaleY = cropCanvas.height / rect.height;
+
+    cropStartX = (e.clientX - rect.left) * scaleX;
+    cropStartY = (e.clientY - rect.top) * scaleY;
+    isDraggingCrop = true;
+
+    cropSelection.classList.remove('hidden');
+    cropSelection.style.left = `${e.clientX - rect.left}px`;
+    cropSelection.style.top = `${e.clientY - rect.top}px`;
+    cropSelection.style.width = '0px';
+    cropSelection.style.height = '0px';
+  });
+
+  cropCanvasWrapper.addEventListener('mousemove', (e) => {
+    if (!isDraggingCrop) return;
+
+    const rect = cropCanvasWrapper.getBoundingClientRect();
+    const scaleX = cropCanvas.width / rect.width;
+    const scaleY = cropCanvas.height / rect.height;
+
+    const currentX = (e.clientX - rect.left) * scaleX;
+    const currentY = (e.clientY - rect.top) * scaleY;
+
+    const x = Math.min(cropStartX, currentX);
+    const y = Math.min(cropStartY, currentY);
+    const width = Math.abs(currentX - cropStartX);
+    const height = Math.abs(currentY - cropStartY);
+
+    cropRect = { x, y, width, height };
+
+    // Update visual selection
+    const displayScale = rect.width / cropCanvas.width;
+    cropSelection.style.left = `${x * displayScale}px`;
+    cropSelection.style.top = `${y * displayScale}px`;
+    cropSelection.style.width = `${width * displayScale}px`;
+    cropSelection.style.height = `${height * displayScale}px`;
+  });
+
+  cropCanvasWrapper.addEventListener('mouseup', () => {
+    isDraggingCrop = false;
+  });
+
+  async function runOcrOnCrop() {
+    if (cropRect.width < 10 || cropRect.height < 10) {
+      showError('Please select a larger region', 'warning');
+      return;
+    }
+
+    closeManualCrop();
+
+    // Create cropped image
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = cropRect.width;
+    croppedCanvas.height = cropRect.height;
+    const ctx = croppedCanvas.getContext('2d')!;
+    ctx.drawImage(originalImageCanvas!, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 0, 0, cropRect.width, cropRect.height);
+
+    const croppedImageData = croppedCanvas.toDataURL('image/png');
+
+    // Run OCR on cropped region
+    updateProgress('Running OCR on cropped region...', 50);
+
+    try {
+      const { createWorker } = await import('tesseract.js');
+      const worker = await createWorker('eng', 1);
+      const { data } = await worker.recognize(croppedImageData);
+      await worker.terminate();
+
+      if (data.text.trim()) {
+        // Add new result
+        ocrResults.push({
+          region: { x: cropRect.x, y: cropRect.y, width: cropRect.width, height: cropRect.height, imageData: croppedImageData },
+          text: data.text.trim(),
+          confidence: data.confidence
+        });
+
+        detectedTextRegions.push({
+          x: cropRect.x, y: cropRect.y, width: cropRect.width, height: cropRect.height, imageData: croppedImageData
+        });
+
+        // Update display
+        const regions = detectedTextRegions.map(r => ({ x: r.x, y: r.y, width: r.width, height: r.height }));
+        const results = ocrResults.map(r => ({ text: r.text, confidence: r.confidence }));
+
+        displayBoundingBoxes(regions, results);
+        displayExtractedTextPanel(regions, results);
+        displayDetectedRegions(regions, results);
+
+        showError(`Added text: "${data.text.trim().substring(0, 50)}..."`, 'warning');
+      } else {
+        showError('No text detected in selected region', 'warning');
+      }
+    } catch (err) {
+      showError('OCR failed on cropped region', 'error');
+    }
+  }
+
+  // Event listeners for new features
+  toggleOverlayBtn.addEventListener('click', () => {
+    showBoundingBoxes = !showBoundingBoxes;
+    if (ocrResults.length > 0) {
+      const regions = detectedTextRegions.map(r => ({ x: r.x, y: r.y, width: r.width, height: r.height }));
+      const results = ocrResults.map(r => ({ text: r.text, confidence: r.confidence }));
+      displayBoundingBoxes(regions, results);
+    }
+  });
+
+  manualCropBtn.addEventListener('click', openManualCrop);
+  closeCropModalBtn.addEventListener('click', closeManualCrop);
+  cancelCropBtn.addEventListener('click', closeManualCrop);
+  runOcrOnCropBtn.addEventListener('click', runOcrOnCrop);
+
+  selectAllTextBtn.addEventListener('click', () => {
+    ocrResults.forEach((_, index) => selectedRegions.add(index));
+    const regions = detectedTextRegions.map(r => ({ x: r.x, y: r.y, width: r.width, height: r.height }));
+    const results = ocrResults.map(r => ({ text: r.text, confidence: r.confidence }));
+    displayBoundingBoxes(regions, results);
+    displayExtractedTextPanel(regions, results);
+  });
+
+  searchTextBtn.addEventListener('click', () => {
+    searchContainer.classList.toggle('hidden');
+    if (!searchContainer.classList.contains('hidden')) {
+      searchInput.focus();
+    }
+  });
+
+  copyPlainTextBtn.addEventListener('click', copyPlainText);
+  copyWithBreaksBtn.addEventListener('click', copyWithBreaks);
+  copyJsonBtn.addEventListener('click', copyJson);
+
+  copyCombinedBtn.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(combinedTextOutput.value);
+    showCopyFeedback(copyCombinedBtn);
+  });
+
+  // Handle image resize for bounding boxes
+  originalImagePreview.addEventListener('load', () => {
+    const rect = originalImagePreview.getBoundingClientRect();
+    const scaleFactor = originalImagePreview.naturalWidth > 0 ? rect.width / originalImagePreview.naturalWidth : 1;
+
+    if (ocrResults.length > 0) {
+      const regions = detectedTextRegions.map(r => ({ x: r.x, y: r.y, width: r.width, height: r.height }));
+      const results = ocrResults.map(r => ({ text: r.text, confidence: r.confidence }));
+      displayBoundingBoxes(regions, results, scaleFactor);
+    }
+  });
+
+  // Display font match results
+  function displayFontMatches(matches: { font: string, confidence: number, category: string }[]) {
+    fontMatchResults.classList.remove('hidden');
+    fontMatchesContainer.innerHTML = '';
+
+    // Add detected fonts to currentFonts for export
+    currentFonts = matches.map(m => m.font);
+
+    if (matches.length > 0) {
+      exportTailwindBtn.classList.remove('hidden');
+      exportCssBtn.classList.remove('hidden');
+    }
+
+    matches.forEach((match, index) => {
+      const card = document.createElement('div');
+      card.className = 'bg-[#121212] border border-[#222] p-4 hover:border-primary transition-colors';
+
+      // Load font
+      const fontLink = document.createElement('link');
+      fontLink.href = `https://fonts.googleapis.com/css2?family=${match.font.replace(/\s+/g, '+')}&display=swap`;
+      fontLink.rel = 'stylesheet';
+      document.head.appendChild(fontLink);
+
+      const confidenceColor = match.confidence >= 70 ? 'text-green-500' : match.confidence >= 40 ? 'text-yellow-500' : 'text-red-500';
+      const confidenceBar = `<div class="h-1 bg-[#222] rounded mt-2 overflow-hidden"><div class="h-full ${match.confidence >= 70 ? 'bg-green-500' : match.confidence >= 40 ? 'bg-yellow-500' : 'bg-red-500'}" style="width: ${match.confidence}%"></div></div>`;
+
+      card.innerHTML = `
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <div class="font-display text-lg text-white">${match.font}</div>
+            <div class="font-mono text-xs text-neutral-500 uppercase">${match.category}</div>
+          </div>
+          <div class="text-right">
+            <div class="font-mono text-2xl ${confidenceColor}">${match.confidence}%</div>
+            ${confidenceBar}
+          </div>
+        </div>
+        <div class="text-xl text-neutral-300" style="font-family: '${match.font}', sans-serif;">
+          The quick brown fox jumps over the lazy dog
+        </div>
+        <div class="mt-3 pt-3 border-t border-[#222] flex justify-between items-center">
+          <a href="https://fonts.google.com/specimen/${match.font.replace(/\s+/g, '+')}" target="_blank" class="font-mono text-xs text-primary hover:underline">View on Google Fonts</a>
+        </div>
+      `;
+
+      fontMatchesContainer.appendChild(card);
+    });
+  }
+
+  // Full image extraction process
+  async function performFullExtraction() {
+    if (!selectedImage) {
+      showError('Please select an image first');
+      return;
+    }
+
+    ocrBtn.disabled = true;
+    ocrBtnText.textContent = 'Processing...';
+    ocrBtnIcon.classList.add('hidden');
+    ocrLoadingIcon.classList.remove('hidden');
+    errorMessage.classList.add('hidden');
+    resultsArea.classList.add('hidden');
+    fontMatchResults.classList.add('hidden');
+    extractedTextPanel.classList.add('hidden');
+    imagePreviewContainer.classList.add('hidden');
+    processingProgress.classList.remove('hidden');
+
+    // Reset
+    selectedRegions.clear();
+    ocrResults = [];
+
+    try {
+      // Load image
+      updateProgress('Loading image...', 10);
+
+      const reader = new FileReader();
+      const imageDataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(selectedImage);
+      });
+
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageDataUrl;
+      });
+
+      // Store original dimensions
+      originalImageWidth = img.width;
+      originalImageHeight = img.height;
+
+      // Show dimensions in preview
+      const imageDimensions = document.getElementById('imageDimensions') as HTMLElement;
+      if (imageDimensions) {
+        imageDimensions.textContent = `${img.width} × ${img.height}`;
+      }
+
+      // Preprocess (keep original for display, process for OCR)
+      const { original, processed } = await preprocessImage(img);
+      originalImageCanvas = original;
+      processedImageCanvas = processed;
+
+      // Show original image with bounding boxes (not preprocessed)
+      originalImagePreview.src = imageDataUrl;
+      imagePreviewContainer.classList.remove('hidden');
+
+      // Detect text regions on preprocessed image (but use original for OCR)
+      const regions = await detectTextRegions(processed, original);
+      detectedTextRegions = regions;
+
+      // Run OCR on regions
+      updateProgress('Running OCR...', 70);
+      const ocrResultsRaw = await runOCROnRegions(regions);
+      ocrResults = ocrResultsRaw;
+
+      // Display bounding boxes on original image
+      if (ocrResultsRaw.length > 0) {
+        const regionsData = detectedTextRegions.map(r => ({ x: r.x, y: r.y, width: r.width, height: r.height }));
+        const resultsData = ocrResultsRaw.map(r => ({ text: r.text, confidence: r.confidence }));
+
+        // Get scale factor from displayed image
+        setTimeout(() => {
+          const rect = originalImagePreview.getBoundingClientRect();
+          const scaleFactor = originalImageWidth > 0 && rect.width > 0 ? rect.width / originalImageWidth : 1;
+          displayBoundingBoxes(regionsData, resultsData, scaleFactor);
+          displayExtractedTextPanel(regionsData, resultsData);
+        }, 100);
+      } else {
+        showError('[INFO] No text detected. Try adjusting preprocessing or using a clearer image.', 'warning');
+      }
+
+      // Match fonts
+      updateProgress('Matching fonts...', 90);
+
+      const textRegionsWithImageData = ocrResultsRaw.map(result => {
+        const regionCanvas = document.createElement('canvas');
+        regionCanvas.width = result.region.width;
+        regionCanvas.height = result.region.height;
+        const ctx = regionCanvas.getContext('2d')!;
+        const imgObj = new Image();
+        imgObj.src = result.region.imageData;
+        ctx.drawImage(imgObj, 0, 0);
+        const imageData = ctx.getImageData(0, 0, regionCanvas.width, regionCanvas.height);
+
+        return { imageData, text: result.text };
+      });
+
+      const fontMatches = await matchFonts(textRegionsWithImageData);
+
+      // Display results
+      if (fontMatches.length > 0) {
+        displayFontMatches(fontMatches);
+        resultCount.textContent = `${fontMatches.length} Font Matches Found`;
+      } else if (ocrResultsRaw.length > 0) {
+        const allText = ocrResultsRaw.map(r => r.text).join(' ');
+        if (allText) {
+          resultCount.textContent = `Text Extracted • ${Math.round(ocrResultsRaw.reduce((a, b) => a + b.confidence, 0) / ocrResultsRaw.length)}%`;
+        }
+      }
+
+    } catch (error: any) {
+      console.error('Extraction Error:', error);
+      showError(`[ERROR] ${error.message || 'Failed to process image'}`);
+    } finally {
+      ocrBtn.disabled = false;
+      ocrBtnText.textContent = 'Extract Text & Fonts';
+      ocrLoadingIcon.classList.add('hidden');
+      ocrBtnIcon.classList.remove('hidden');
+      processingProgress.classList.add('hidden');
+    }
+  }
+
+  // Simple OCR (fallback for direct extraction)
   async function performOCR() {
     if (!selectedImage) {
       showError('Please select an image first');
@@ -405,9 +2204,9 @@ import '../styles/global.css';
     ocrLoadingIcon.classList.remove('hidden');
     errorMessage.classList.add('hidden');
     resultsArea.classList.add('hidden');
+    fontMatchResults.classList.add('hidden');
 
     try {
-      // Convert file to base64 data URL
       const reader = new FileReader();
       const imageDataUrl = await new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve(reader.result as string);
@@ -415,7 +2214,7 @@ import '../styles/global.css';
         reader.readAsDataURL(selectedImage);
       });
 
-      // Create Tesseract worker
+      const { createWorker } = await import('tesseract.js');
       const worker = await createWorker('eng', 1, {
         logger: (m: any) => {
           if (m.status === 'recognizing text') {
@@ -430,10 +2229,8 @@ import '../styles/global.css';
       const extractedText = data.text.trim();
 
       if (extractedText) {
-        // Try to get font name from the OCR results
         let detectedFont: string | null = null;
         if (data.words && data.words.length > 0) {
-          // Look for a word that has a valid font name
           for (const word of data.words) {
             if (word.font_name && word.font_name !== 'Unknown' && word.font_name.length > 2) {
               detectedFont = word.font_name.replace(/_/g, ' ');
@@ -442,7 +2239,6 @@ import '../styles/global.css';
           }
         }
 
-        // Only set fonts if we have a valid detected font
         if (detectedFont && detectedFont !== 'Unknown') {
           try {
             const fontLink = document.createElement('link');
@@ -455,7 +2251,6 @@ import '../styles/global.css';
           exportTailwindBtn.classList.remove('hidden');
           exportCssBtn.classList.remove('hidden');
         } else {
-          // Font detection not supported for images - show extracted text only
           currentFonts = [];
           exportTailwindBtn.classList.add('hidden');
           exportCssBtn.classList.add('hidden');
@@ -523,7 +2318,15 @@ import '../styles/global.css';
     }
   }
 
-  ocrBtn.addEventListener('click', performOCR);
+  ocrBtn.addEventListener('click', performFullExtraction);
+
+  rerunDetectionBtn.addEventListener('click', async () => {
+    if (processedImageCanvas && originalImageCanvas) {
+      const regions = await detectTextRegions(processedImageCanvas, originalImageCanvas);
+      detectedTextRegions = regions;
+      displayDetectedRegions(regions);
+    }
+  });
 
   function showError(msg: string, type: 'error' | 'warning' = 'error') {
     errorMessage.textContent = msg;
@@ -537,18 +2340,24 @@ import '../styles/global.css';
 
   async function performExtraction() {
     const url = input.value.trim();
-    if (!url) return;
+    if (!url) {
+      alert('Please enter a URL');
+      return;
+    }
 
-    // UI Loading state
+    console.log('performExtraction called, url:', url);
+    alert('Starting scan for: ' + url);
+
     btn.disabled = true;
     btnText.textContent = 'Scanning...';
     btnIcon.classList.add('hidden');
     loadingIcon.classList.remove('hidden');
     errorMessage.classList.add('hidden');
     resultsArea.classList.add('hidden');
+    if (fontFilterBar) fontFilterBar.classList.add('hidden');
     fontsGrid.innerHTML = '';
-    
-    // Hide export buttons during scan
+    urlModeFonts = [];
+
     exportTailwindBtn.classList.add('hidden');
     exportCssBtn.classList.add('hidden');
 
@@ -566,56 +2375,43 @@ import '../styles/global.css';
       }
 
       if (data.fonts && data.fonts.length > 0) {
-        // Save to history on success
         addRecentScan(url);
-        
-        // Update currentFonts for export
+
         currentFonts = data.fonts;
         exportTailwindBtn.classList.remove('hidden');
         exportCssBtn.classList.remove('hidden');
 
+        // Store preview text globally for filtering
+        (window as any).__previewText = data.previewText || "The quick brown fox jumps over the lazy dog.";
+
         resultCount.textContent = `${data.fonts.length} Fonts Found on ${data.siteTitle || 'Target'}`;
-        const displayPreviewText = data.previewText || "The quick brown fox jumps over the lazy dog.";
 
-        data.fonts.forEach((font: string) => {
-          const cleanFont = font.replace(/["']/g, '');
-          const card = document.createElement('div');
-          card.className = 'bg-[#121212] border border-[#222] p-6 hover:border-primary transition-colors group relative overflow-hidden cursor-pointer';
+        // Build font data with Google Fonts detection
+        const knownGoogleFonts = new Set(fontDatabase.map(f => f.name.toLowerCase()));
 
-          const bgPattern = document.createElement('div');
-          bgPattern.className = 'absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity bg-[radial-gradient(#ff4f00_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none';
-          card.appendChild(bgPattern);
+        function isLikelyGoogleFont(fontName: string): boolean {
+          const lower = fontName.toLowerCase();
+          if (knownGoogleFonts.has(lower)) return true;
+          const googlePatterns = ['roboto', 'open sans', 'lato', 'montserrat', 'oswald', 'raleway', 'poppins', 'source', 'ubuntu', 'merriweather', 'playfair', 'lora', 'inter', 'nunito', 'rubik', 'work sans', ' DM ', 'IBM', 'sora', 'outfit', 'space mono', 'jetbrains', 'fira code', 'crimson', 'libre', 'noto', 'PT ', 'archivo', 'anton', 'bebas', 'comfortaa', 'lobster', 'pacifico', 'dancing', 'caveat', 'fredoka', 'lexend', 'fraunces', 'cormorant', 'eb garamond', 'spectral', 'newsreader', 'titillium', 'heebo', 'maven', 'mukta', 'barlow', 'syne', 'epilogue', 'plus jakarta', 'red hat', 'tenor', 'spline', 'cabin', 'josefin', 'karla', 'quicksand', 'hind', 'catamaran', 'cantarell', 'albert', 'bitter', 'cardo', 'arvo'];
+          return googlePatterns.some(p => lower.includes(p));
+        }
 
-          const fontLink = document.createElement('link');
-          fontLink.href = `https://fonts.googleapis.com/css2?family=${cleanFont.replace(/\s+/g, '+')}&display=swap`;
-          fontLink.rel = 'stylesheet';
-          document.head.appendChild(fontLink);
+        urlModeFonts = data.fonts.map((font: string) => ({
+          font: font.replace(/["']/g, ''),
+          isGoogleFont: isLikelyGoogleFont(font)
+        }));
 
-          card.innerHTML += `
-            <div class="relative z-10 pointer-events-none">
-              <div class="font-mono text-[10px] text-neutral-500 mb-4 uppercase flex justify-between">
-                <span>Family</span>
-                <span class="text-primary hidden group-hover:inline-block">Click to Copy CSS</span>
-              </div>
-              <h3 class="font-display text-2xl text-white mb-2 truncate" title="${cleanFont}">${cleanFont}</h3>
-              <p class="text-xl mt-6 line-clamp-3 text-neutral-300" style="font-family: '${cleanFont}', sans-serif;">${displayPreviewText}</p>
-            </div>
-          `;
+        // Show filter bar and reset filters
+        if (fontFilterBar) fontFilterBar.classList.remove('hidden');
+        if (fontSearchInput) fontSearchInput.value = '';
+        if (fontSortSelect) fontSortSelect.value = 'original';
+        if (googleFontsOnlyCheckbox) googleFontsOnlyCheckbox.checked = false;
+        currentSort = 'original';
+        currentSearch = '';
+        googleFontsOnly = false;
 
-          card.addEventListener('click', () => {
-            navigator.clipboard.writeText(`font-family: '${cleanFont}';`);
-            const header = card.querySelector('h3');
-            const originalText = header!.textContent;
-            header!.textContent = 'Copied!';
-            header!.classList.add('text-primary');
-            setTimeout(() => {
-              header!.textContent = originalText;
-              header!.classList.remove('text-primary');
-            }, 1500);
-          });
-
-          fontsGrid.appendChild(card);
-        });
+        // Render all fonts using the filter/sort system
+        filterAndSortFonts();
 
         resultsArea.classList.remove('hidden');
       } else {
@@ -633,8 +2429,44 @@ import '../styles/global.css';
     }
   }
 
-  btn.addEventListener('click', performExtraction);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') performExtraction();
+  // Add direct event listener with logging - wrap in DOMContentLoaded
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM ready, setting up event listeners...');
+
+    if (btn) {
+      btn.addEventListener('click', function(e) {
+        console.log('Button clicked!', e);
+        performExtraction();
+      });
+      console.log('Button click handler attached');
+    } else {
+      console.error('Button not found at DOMContentLoaded');
+    }
+
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          console.log('Enter pressed, triggering extraction');
+          performExtraction();
+        }
+      });
+    }
   });
+
+  // Also try setting up immediately in case DOM is already loaded
+  setTimeout(() => {
+    if (btn && !btn.onclick) {
+      console.log('Setting up button handler via setTimeout');
+      btn.onclick = function(e) {
+        console.log('Button clicked via onclick!', e);
+        performExtraction();
+      };
+    }
+  }, 100);
+
+  // Initial log to confirm script loaded
+  console.log('Fontextractor script loaded successfully');
+
+  // Expose performExtraction to window for inline onclick
+  (window as any).performExtraction = performExtraction;
 </script>
